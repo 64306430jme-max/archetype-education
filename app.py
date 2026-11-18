@@ -1,1461 +1,1069 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Archétype Satellites | Démonstration Interactive</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @media print {
-            .no-print { display: none !important; }
-            body { background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0; padding: 0; }
-            .print-container { padding: 0; margin: 0; box-shadow: none; border: none; width: 100%; max-width: 100%; }
+import io
+import re
+import textwrap
+import streamlit as st
+import pandas as pd
+import numpy as np
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from matplotlib.patches import FancyBboxPatch, Rectangle
+from matplotlib.backends.backend_pdf import PdfPages
+
+st.set_page_config(
+    page_title="Archétype Éducation — Audit ANC 2018-06, Normes & Prospective",
+    page_icon="🎓",
+    layout="wide"
+)
+
+# ==========================================
+# 1. RÉFÉRENTIEL & MOYENNES PAR STRATE (ANC 2018-06)
+# ==========================================
+def get_normes_etablissement(type_etab):
+    if "1er degré" in type_etab:
+        return {
+            "type_court": "1er degré (École)",
+            "strate": "Écoles sous contrat (Loi Debré — Art. L. 442-5)",
+            "financeur": "Commune (Forfait communal)",
+            "forfait_eleve": 880,
+            "contrib_eleve": 420,
+            "taux_ebe": 9.5,
+            "taux_caf": 6.5,
+            "jours_treso": 90,
+            "poids_ms": 48.0,
+            "poids_admin": 24.0,
+            "b_peda": 70,
+            "maint_m2": 15.0,
+            "fluides_eleve": 145,
+            "tx_internat": 0,
+            "desend_moy": 5.2,
+            "desend_max": 8.0
         }
-    </style>
-</head>
-<body class="bg-slate-100 font-sans text-slate-800 p-3 md:p-6">
+    elif "Collège" in type_etab:
+        return {
+            "type_court": "2nd degré (Collège)",
+            "strate": "Collèges sous contrat (Art. L. 442-9)",
+            "financeur": "Département (Forfait externat)",
+            "forfait_eleve": 647,
+            "contrib_eleve": 580,
+            "taux_ebe": 10.5,
+            "taux_caf": 7.5,
+            "jours_treso": 90,
+            "poids_ms": 44.0,
+            "poids_admin": 26.0,
+            "b_peda": 100,
+            "maint_m2": 18.0,
+            "fluides_eleve": 165,
+            "tx_internat": 5,
+            "desend_moy": 5.5,
+            "desend_max": 8.0
+        }
+    elif "Lycée GT" in type_etab:
+        return {
+            "type_court": "2nd degré (Lycée GT/Pro)",
+            "strate": "Lycées GT & Pro sous contrat (Art. L. 442-9)",
+            "financeur": "Région (Forfait externat)",
+            "forfait_eleve": 803,
+            "contrib_eleve": 690,
+            "taux_ebe": 11.2,
+            "taux_caf": 8.0,
+            "jours_treso": 90,
+            "poids_ms": 42.0,
+            "poids_admin": 27.0,
+            "b_peda": 130,
+            "maint_m2": 22.0,
+            "fluides_eleve": 190,
+            "tx_internat": 12,
+            "desend_moy": 5.8,
+            "desend_max": 8.0
+        }
+    elif "Agricole" in type_etab:
+        return {
+            "type_court": "Lycée Agricole (MASA)",
+            "strate": "Enseignement Agricole Temps Plein (Art. L. 813-8)",
+            "financeur": "MASA (Subv. globale) & Région",
+            "forfait_eleve": 2450,
+            "contrib_eleve": 720,
+            "taux_ebe": 11.5,
+            "taux_caf": 8.5,
+            "jours_treso": 75,
+            "poids_ms": 46.0,
+            "poids_admin": 25.0,
+            "b_peda": 150,
+            "maint_m2": 28.0,
+            "fluides_eleve": 260,
+            "tx_internat": 65,
+            "desend_moy": 6.0,
+            "desend_max": 8.5
+        }
+    elif "MFR" in type_etab:
+        return {
+            "type_court": "MFR / Alternance",
+            "strate": "Maisons Familiales Rurales (Art. L. 813-9)",
+            "financeur": "MASA & OPCO",
+            "forfait_eleve": 4100,
+            "contrib_eleve": 680,
+            "taux_ebe": 10.8,
+            "taux_caf": 8.0,
+            "jours_treso": 75,
+            "poids_ms": 64.0,
+            "poids_admin": 23.0,
+            "b_peda": 150,
+            "maint_m2": 24.0,
+            "fluides_eleve": 240,
+            "tx_internat": 75,
+            "desend_moy": 5.5,
+            "desend_max": 8.0
+        }
+    else:
+        return {
+            "type_court": "Ensemble scolaire mixte",
+            "strate": "Ensembles scolaires multi-niveaux (Loi Debré)",
+            "financeur": "Commune + Département + Région",
+            "forfait_eleve": 760,
+            "contrib_eleve": 560,
+            "taux_ebe": 10.5,
+            "taux_caf": 7.5,
+            "jours_treso": 90,
+            "poids_ms": 45.0,
+            "poids_admin": 26.0,
+            "b_peda": 110,
+            "maint_m2": 20.0,
+            "fluides_eleve": 175,
+            "tx_internat": 8,
+            "desend_moy": 5.6,
+            "desend_max": 8.0
+        }
 
-<div class="max-w-6xl mx-auto">
-    
-    <!-- En-tête Principal & Badge Démonstration -->
-    <div class="bg-slate-900 text-white p-5 rounded-t-xl shadow-lg flex flex-col md:flex-row justify-between items-center no-print">
-        <div>
-            <div class="text-[10px] uppercase font-bold tracking-widest text-blue-400">Direction Générale & Finances</div>
-            <h1 class="text-xl md:text-2xl font-black tracking-tight">ARCHÉTYPE SATELLITES</h1>
-            <p class="text-xs text-slate-400 mt-0.5">Plateforme Sécurisée d'Arbitrage des SEM, SPL, DSP & Tiers</p>
-        </div>
-        <div class="mt-3 md:mt-0 flex items-center gap-3">
-            <span class="bg-amber-500/20 border border-amber-400/50 text-amber-300 text-[11px] font-black uppercase tracking-wider px-3 py-1.5 rounded-lg">
-                Mode Démonstration
-            </span>
-        </div>
-    </div>
+def afficher_synthese_unique(titre, constat, points_appui, leviers_budget):
+    st.markdown("---")
+    with st.container(border=True):
+        st.markdown(f"### Synthèse & Clés de lecture — {titre}")
+        st.markdown(f"**1. Positionnement normatif & diagnostic :** {constat}")
+        st.markdown(f"**2. Points d'appui & marges de manœuvre :** {points_appui}")
+        st.markdown(f"**3. Leviers d'ajustement du budget prévisionnel :** {leviers_budget}")
 
-    <!-- BANDEAU D'INFORMATION DÉMONSTRATION -->
-    <div class="bg-amber-50 px-5 py-3 border-x border-b border-amber-300 no-print flex flex-col sm:flex-row justify-between items-center gap-2 text-xs text-amber-950">
-        <div>
-            <span class="font-black uppercase">Environnement de test interactif :</span>
-            <span>manipulez librement les ratios financiers, juridiques et de gouvernance sur les trois cas fictifs préchargés.</span>
-        </div>
-        <button onclick="loadCaseTemplate()" class="shrink-0 bg-amber-800 hover:bg-amber-900 text-white font-bold py-1 px-3 rounded text-[11px] transition">
-            Réinitialiser le cas
-        </button>
-    </div>
+# ==========================================
+# 2. INGESTION BALANCES COMPTABLES (ANC 2018-06)
+# ==========================================
+def _read_tabular_file(file_obj):
+    name = getattr(file_obj, "name", "balance.csv")
+    raw = file_obj.getvalue() if hasattr(file_obj, "getvalue") else file_obj.read()
+    if name.lower().endswith((".xlsx", ".xls")):
+        try:
+            return pd.read_excel(io.BytesIO(raw))
+        except Exception:
+            return None
+    for enc in ("utf-8", "latin-1", "cp1252"):
+        for sep in (";", ",", "\t"):
+            try:
+                tmp = pd.read_csv(io.BytesIO(raw), sep=sep, encoding=enc)
+                if tmp.shape[1] >= 2:
+                    return tmp
+            except Exception:
+                continue
+    return None
 
-    <!-- ESPACE DE TRAVAIL DE L'AUDIT (OUVERT EN MODE DÉMO) -->
-    <div id="workspace-section" class="bg-white p-6 md:p-8 rounded-b-xl shadow-lg no-print space-y-8">
-        
-        <!-- BARRE DE STATUT DÉMO -->
-        <div class="bg-slate-900 text-white p-4 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4">
-            <div class="flex items-center gap-3 w-full md:w-auto">
-                <span class="text-xl">📁</span>
-                <div>
-                    <div class="text-xs font-bold text-blue-300 uppercase">Dossier de démonstration actif :</div>
-                    <div id="current-dossier-label" class="text-sm font-black text-white">SEM Adour Mobilité Rurale (Cas fictif)</div>
-                </div>
-            </div>
-            
-            <div class="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-                <button onclick="demoRestrictedNotice()" class="bg-slate-800 hover:bg-slate-700 text-slate-400 font-bold py-2 px-4 rounded text-xs flex items-center gap-1.5 border border-slate-700 cursor-not-allowed">
-                    <span>🔒</span> Sauvegarde Cloud (Version complète)
-                </button>
-                <button onclick="loadCaseTemplate()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded text-xs shadow">
-                    ↻ Valeurs d'origine
-                </button>
-            </div>
-        </div>
+def _to_num(series):
+    return pd.to_numeric(
+        series.astype(str).str.replace(r"[\xa0\s]", "", regex=True).str.replace(",", ".", regex=False),
+        errors="coerce"
+    ).fillna(0.0)
 
-        <div id="input-section">
-        <!-- ÉTAPE 0 : PARAMÉTRAGE DU DOSSIER & SECTEUR D'ACTIVITÉ -->
-        <div class="bg-blue-50/70 p-5 rounded-xl border border-blue-200 space-y-4 mb-8">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h2 class="text-sm font-bold text-blue-950 uppercase tracking-wide">Étape 0 : Choix du Cas Fictif & Typologie Sectorielle</h2>
-                    <p class="text-xs text-blue-700">Sélectionnez l'un des trois scénarios préchargés. Le secteur calibre automatiquement les seuils d'alerte.</p>
-                </div>
-                <div class="w-full md:w-80">
-                    <select id="case-selector" onchange="loadCaseTemplate()" class="w-full border-2 border-blue-300 bg-white p-2 text-xs rounded-lg font-bold text-blue-900 outline-none">
-                        <option value="adour">Cas Démo 1 : SEM Adour Mobilité Rurale (Transport)</option>
-                        <option value="amenagement">Cas Démo 2 : SPL Grand Sud Aménagement (Foncier)</option>
-                        <option value="esms">Cas Démo 3 : ESMS Le Bois Fleuri (Médico-social M22)</option>
-                    </select>
-                </div>
-            </div>
+def parse_balance_ogec(file_obj):
+    name = getattr(file_obj, "name", "balance_2025.csv")
+    ym = re.search(r"(20[1-3]\d)", name)
+    annee = ym.group(1) if ym else None
+    df = _read_tabular_file(file_obj)
+    if df is None or df.empty:
+        return None
 
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-                <div>
-                    <label class="block font-semibold mb-1 text-slate-700">Structure auditée (verrouillé)</label>
-                    <input type="text" id="cfg-entity" readonly title="Intitulé verrouillé en mode démonstration" class="w-full border border-slate-300 p-2 rounded bg-slate-100 text-slate-600 font-medium cursor-not-allowed" value="SEM Adour Mobilité Rurale">
-                </div>
-                <div>
-                    <label class="block font-semibold mb-1 text-slate-700">Collectivité / Tutrice (verrouillé)</label>
-                    <input type="text" id="cfg-authority" readonly title="Intitulé verrouillé en mode démonstration" class="w-full border border-slate-300 p-2 rounded bg-slate-100 text-slate-600 font-medium cursor-not-allowed" value="Conseil Départemental des Landes">
-                </div>
-                <div>
-                    <label class="block font-semibold mb-1 text-slate-700">Instance délibérante (verrouillé)</label>
-                    <input type="text" id="cfg-instance" readonly title="Intitulé verrouillé en mode démonstration" class="w-full border border-slate-300 p-2 rounded bg-slate-100 text-slate-600 font-medium cursor-not-allowed" value="Commission Permanente (Séance DM2)">
-                </div>
-                <div>
-                    <label class="block font-semibold mb-1 text-blue-900 font-bold">Référentiel Sectoriel</label>
-                    <select id="cfg-sector" onchange="computeFinances()" class="w-full border-2 border-blue-200 p-2 rounded bg-white font-bold text-blue-950">
-                        <option value="transport" selected>Transport Public & DSP (SEM/SPL)</option>
-                        <option value="amenagement">Aménagement & Logement (SEM/SPL)</option>
-                        <option value="medicosocial">Médico-social & Santé (M22 / CPOM)</option>
-                        <option value="general">Association / Entreprise Générale</option>
-                    </select>
-                </div>
-            </div>
+    cols_l = {c: str(c).strip().lower() for c in df.columns}
+    compte_col = next((c for c, cl in cols_l.items() if any(k in cl for k in ("compte", "article", "nature"))), df.columns[0])
+    lib_col = next((c for c, cl in cols_l.items() if "libell" in cl or "intitul" in cl), None)
+    deb_col = next((c for c, cl in cols_l.items() if "débit" in cl or "debit" in cl), None)
+    cred_col = next((c for c, cl in cols_l.items() if "crédit" in cl or "credit" in cl), None)
+    solde_col = next((c for c, cl in cols_l.items() if "solde" in cl or "montant" in cl), None)
 
-            <!-- Interrupteurs de modules -->
-            <div class="border-t border-blue-200 pt-3">
-                <span class="block text-[11px] font-black uppercase text-blue-900 tracking-wider mb-2">Périmètre commandé :</span>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                    <label class="flex items-center gap-2 p-2 bg-white rounded border border-blue-200 cursor-pointer font-bold text-slate-700">
-                        <input type="checkbox" id="mod-toggle-fin" onchange="toggleModule('fin')" checked class="rounded text-blue-600">
-                        <span>Volet 1. Finances & Bilan</span>
-                    </label>
-                    <label class="flex items-center gap-2 p-2 bg-white rounded border border-blue-200 cursor-pointer font-bold text-slate-700">
-                        <input type="checkbox" id="mod-toggle-jur" onchange="toggleModule('jur')" checked class="rounded text-blue-600">
-                        <span>Volet 2. Légalité & Risques</span>
-                    </label>
-                    <label class="flex items-center gap-2 p-2 bg-white rounded border border-blue-200 cursor-pointer font-bold text-slate-700">
-                        <input type="checkbox" id="mod-toggle-quinze" onchange="toggleModule('quinze')" checked class="rounded text-blue-600">
-                        <span>Volet 3. Matrice de Gouvernance</span>
-                    </label>
-                    <label class="flex items-center gap-2 p-2 bg-white rounded border border-blue-200 cursor-pointer font-bold text-slate-700">
-                        <input type="checkbox" id="mod-toggle-other" onchange="toggleModule('other')" checked class="rounded text-blue-600">
-                        <span>Volet 4. Fait Majeur</span>
-                    </label>
-                </div>
-            </div>
-        </div>
+    raw_c = df[compte_col].astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
+    debits = _to_num(df[deb_col]) if deb_col else (_to_num(df[solde_col]).abs() if solde_col else pd.Series(0.0, index=df.index))
+    credits = _to_num(df[cred_col]) if cred_col else (_to_num(df[solde_col]).abs() if solde_col else pd.Series(0.0, index=df.index))
 
-        <!-- COMMUTATEUR : ALERTE ROUGE DÉCLASSANTE -->
-        <div class="bg-red-50 p-4 rounded-xl border-2 border-red-300 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-            <div class="flex items-start gap-3">
-                <span class="text-2xl">🚨</span>
-                <div>
-                    <div class="flex items-center gap-2">
-                        <h2 class="text-sm font-black text-red-900 uppercase tracking-wide">Alerte Rouge Déclassante (Critère Bloquant)</h2>
-                        <span class="text-[10px] bg-red-200 text-red-800 font-bold px-2 py-0.5 rounded uppercase">Déclassement immédiat</span>
-                    </div>
-                    <p class="text-xs text-red-700 mt-0.5">Activez si un risque pénal, un vice de forme grave ou une cessation de paiements impose un moratoire immédiat.</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-3 w-full md:w-auto justify-end">
-                <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" id="red-flag-toggle" onchange="toggleRedFlag()" class="sr-only peer">
-                    <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
-                </label>
-                <span id="red-flag-status-label" class="text-xs font-black text-slate-500 uppercase">Inactif</span>
-            </div>
-        </div>
+    valid = raw_c.str.match(r"^\d{2,}$")
+    if lib_col:
+        valid = valid & ~df[lib_col].astype(str).str.lower().str.contains(r"\b(total|totaux)\b", regex=True)
 
-        <div id="red-flag-reason-container" class="hidden text-xs bg-red-100/60 p-3 rounded-lg border border-red-200 mb-8">
-            <label class="block font-bold text-red-900 mb-1 uppercase text-[11px]">Motif impératif de l'Alerte Rouge :</label>
-            <input type="text" id="red-flag-reason" class="w-full border border-red-300 p-2 rounded bg-white text-red-900 font-semibold" value="Risque de prise illégale d'intérêts et vice de forme sur avenant DSP">
-        </div>
+    c_val, d_val, cr_val = raw_c[valid], debits[valid], credits[valid]
+    norm_c = c_val.apply(lambda c: c.rstrip("0") if len(c.rstrip("0")) >= 2 else c[:2]) if (c_val.str.len().nunique() == 1 and c_val.str.len().iloc[0] >= 5) else c_val
+    uniques = set(norm_c.unique())
+    parents = {c for c in uniques if any(o != c and o.startswith(c) for o in uniques)}
+    is_leaf = ~norm_c.isin(parents)
 
-        <!-- ZONE DE CALCULS ET FORMULAIRES -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            
-            <!-- MODULE 1 : MOTEUR FINANCIER & BILANCIEL -->
-            <div id="section-mod-fin" class="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4">
-                <div class="border-b pb-2 flex justify-between items-end">
-                    <div>
-                        <h2 class="font-bold text-blue-900 uppercase tracking-wide text-sm border-l-4 border-blue-900 pl-2">
-1. Moteur Financier & Bilanciel
-                        </h2>
-                        <p class="text-xs text-slate-500 mt-0.5">
-                            Cliquez sur <button type="button" onclick="showHelp('moteurGlobal')" class="text-blue-600 font-bold hover:underline">ℹ️ Méthode & Normes</button> pour la vue d'ensemble.
-                        </p>
-                    </div>
-                    <span class="text-[11px] text-slate-400 font-mono">Calcul temps réel</span>
-                </div>
+    comptes, debits, credits = c_val[is_leaf], d_val[is_leaf], cr_val[is_leaf]
 
-                <div class="grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="font-semibold">Chiffre d'Affaires HT</label>
-                            <button type="button" onclick="showHelp('ca')" class="text-blue-600 hover:text-blue-800 font-bold">ℹ️</button>
-                        </div>
-                        <input type="number" id="fn-ca" oninput="computeFinances()" class="w-full border p-2 rounded bg-white" value="4200">
-                    </div>
-                    <div>
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="font-semibold">CAF annuelle</label>
-                            <button type="button" onclick="showHelp('caf')" class="text-blue-600 hover:text-blue-800 font-bold">ℹ️</button>
-                        </div>
-                        <input type="number" id="fn-caf" oninput="computeFinances()" class="w-full border p-2 rounded bg-white" value="110">
-                    </div>
-                    <div>
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="font-semibold">Ressources Durables</label>
-                            <button type="button" onclick="showHelp('ressources')" class="text-blue-600 hover:text-blue-800 font-bold">ℹ️</button>
-                        </div>
-                        <input type="number" id="fn-ressources" oninput="computeFinances()" class="w-full border p-2 rounded bg-white" value="3100">
-                    </div>
-                    <div>
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="font-semibold">Emplois Stables</label>
-                            <button type="button" onclick="showHelp('emplois')" class="text-blue-600 hover:text-blue-800 font-bold">ℹ️</button>
-                        </div>
-                        <input type="number" id="fn-emplois" oninput="computeFinances()" class="w-full border p-2 rounded bg-white" value="3220">
-                    </div>
-                    <div>
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="font-semibold">Actif Circulant (Créances/Stocks)</label>
-                            <button type="button" onclick="showHelp('actifCirc')" class="text-blue-600 hover:text-blue-800 font-bold">ℹ️</button>
-                        </div>
-                        <input type="number" id="fn-actif-circ" oninput="computeFinances()" class="w-full border p-2 rounded bg-white" value="840">
-                    </div>
-                    <div>
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="font-semibold">Passif Circulant (Dettes CT)</label>
-                            <button type="button" onclick="showHelp('passifCirc')" class="text-blue-600 hover:text-blue-800 font-bold">ℹ️</button>
-                        </div>
-                        <input type="number" id="fn-passif-circ" oninput="computeFinances()" class="w-full border p-2 rounded bg-white" value="690">
-                    </div>
-                    <div>
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="font-semibold">Dette Financière Brute</label>
-                            <button type="button" onclick="showHelp('dette')" class="text-blue-600 hover:text-blue-800 font-bold">ℹ️</button>
-                        </div>
-                        <input type="number" id="fn-dette" oninput="computeFinances()" class="w-full border p-2 rounded bg-white" value="2800">
-                    </div>
-                    <div>
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="font-semibold">Garantie d'Emprunt Publique</label>
-                            <button type="button" onclick="showHelp('garantie')" class="text-blue-600 hover:text-blue-800 font-bold">ℹ️</button>
-                        </div>
-                        <select id="fn-garantie-pct" onchange="computeFinances()" class="w-full border p-2 rounded bg-white font-medium">
-                            <option value="0">0 % (Aucune)</option>
-                            <option value="50">50 %</option>
-                            <option value="80" selected>80 %</option>
-                            <option value="100">100 %</option>
-                        </select>
-                    </div>
-                </div>
+    def sum_p(pref, side="debit"):
+        m = comptes.apply(lambda x: any(x.startswith(p) for p in pref))
+        return float(debits[m].sum() if side == "debit" else credits[m].sum())
 
-                <!-- Ratios calculés -->
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2 text-center text-xs">
-                    <div class="bg-white p-2 rounded border">
-                        <div class="text-[10px] text-slate-400 font-bold uppercase flex justify-center items-center gap-1">
-                            FRNG <button type="button" onclick="showHelp('frng')" class="text-blue-500 font-bold">ℹ️</button>
-                        </div>
-                        <div id="calc-frng" class="text-sm font-black text-slate-800">--</div>
-                    </div>
-                    <div class="bg-white p-2 rounded border">
-                        <div class="text-[10px] text-slate-400 font-bold uppercase flex justify-center items-center gap-1">
-                            BFR <button type="button" onclick="showHelp('bfr')" class="text-blue-500 font-bold">ℹ️</button>
-                        </div>
-                        <div id="calc-bfr" class="text-sm font-black text-slate-800">--</div>
-                    </div>
-                    <div class="bg-white p-2 rounded border">
-                        <div class="text-[10px] text-slate-400 font-bold uppercase flex justify-center items-center gap-1">
-                            Trésorerie <button type="button" onclick="showHelp('treso')" class="text-blue-500 font-bold">ℹ️</button>
-                        </div>
-                        <div id="calc-treso" class="text-sm font-black text-slate-800">--</div>
-                    </div>
-                    <div class="bg-white p-2 rounded border">
-                        <div class="text-[10px] text-slate-400 font-bold uppercase flex justify-center items-center gap-1">
-                            Dette/CAF <button type="button" onclick="showHelp('ratioDette')" class="text-blue-500 font-bold">ℹ️</button>
-                        </div>
-                        <div id="calc-ratio-dette" class="text-sm font-black text-slate-800">--</div>
-                    </div>
-                </div>
+    f_74 = sum_p(["74"], "credit")
+    c_756 = sum_p(["756", "7061"], "credit")
+    a_70 = max(0.0, sum_p(["70"], "credit") - sum_p(["7061"], "credit"))
+    aut_p = max(0.0, sum_p(["75", "76", "77", "78", "79"], "credit") - sum_p(["756"], "credit"))
 
-                <!-- ENCADRÉ DIAGNOSTIC NORMATIF AUTOMATISÉ -->
-                <div class="bg-blue-50/80 p-3.5 rounded-lg border border-blue-200 text-xs space-y-2">
-                    <div class="flex justify-between items-center border-b border-blue-200 pb-1.5">
-                        <span class="font-black text-blue-950 uppercase text-[10px] tracking-wider">Avis Clinique Automatisé vs Normes :</span>
-                        <span id="label-sector-norm" class="text-[10px] font-bold text-blue-700 bg-white px-2 py-0.5 rounded border border-blue-200">--</span>
-                    </div>
-                    <ul id="diagnostic-bullet-points" class="space-y-1.5 text-[11px] leading-snug"></ul>
-                </div>
-            </div>
+    ach_60 = sum_p(["60"], "debit")
+    loy_613 = sum_p(["613"], "debit")
+    maint_615 = sum_p(["615"], "debit")
+    aut_ext = max(0.0, sum_p(["61", "62", "63", "65", "67"], "debit") - loy_613 - maint_615)
+    ms_64 = sum_p(["64"], "debit")
+    fin_66 = sum_p(["66"], "debit")
+    amo_68 = sum_p(["68"], "debit")
+    dette_16 = sum_p(["164", "168"], "credit")
+    remb_16 = sum_p(["164", "168"], "debit")
+    tres_51 = sum_p(["512", "514", "53"], "debit")
 
-            <!-- MODULE 2 : CONTRÔLE DE LÉGALITÉ -->
-            <div id="section-mod-jur" class="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4">
-                <div class="border-b pb-2 flex justify-between items-end">
-                    <div>
-                        <h2 class="font-bold text-slate-800 uppercase tracking-wide text-sm border-l-4 border-slate-800 pl-2">
-2. Contrôle de Légalité & Conformité
-                        </h2>
-                        <p class="text-xs text-slate-500 mt-0.5">Décochez les piliers non visés par la lettre de mission.</p>
-                    </div>
-                    <span id="badge-legal-global" class="text-[11px] font-black px-2 py-0.5 rounded uppercase bg-amber-200 text-amber-900">Vigilance</span>
-                </div>
+    tp = f_74 + c_756 + a_70 + aut_p
+    tc = ach_60 + loy_613 + maint_615 + aut_ext + ms_64 + fin_66 + amo_68
+    if tp <= 0 and tc <= 0:
+        return None
 
-                <div class="space-y-3 text-xs">
-                    <!-- J1 Commande publique -->
-                    <div class="bg-white p-2.5 rounded border space-y-1">
-                        <div class="flex justify-between items-center">
-                            <label class="flex items-center gap-1.5 font-bold text-slate-800 cursor-pointer">
-                                <input type="checkbox" id="jur-toggle-1" onchange="computeLegal()" checked class="rounded text-blue-600">
-                                <span>J1. Commande Publique & Avenants</span>
-                            </label>
-                            <div class="flex items-center gap-2">
-                                <button type="button" onclick="showHelp('j1')" class="text-blue-600 hover:text-blue-800 font-bold">ℹ️</button>
-                                <select id="jur-j1" onchange="computeLegal()" class="border rounded p-1 text-[11px] font-bold">
-                                    <option value="1">Conforme</option>
-                                    <option value="0.5">Sous Réserves</option>
-                                    <option value="0" selected>Irrégularité</option>
-                                </select>
-                            </div>
-                        </div>
-                        <input type="text" id="jur-j1-note" class="w-full border p-1 rounded text-[11px]" value="Avenant n°3 modifiant les tarifs sans base légale solide">
-                    </div>
-
-                    <!-- J2 Conventions réglementées -->
-                    <div class="bg-white p-2.5 rounded border space-y-1">
-                        <div class="flex justify-between items-center">
-                            <label class="flex items-center gap-1.5 font-bold text-slate-800 cursor-pointer">
-                                <input type="checkbox" id="jur-toggle-2" onchange="computeLegal()" checked class="rounded text-blue-600">
-                                <span>J2. Conventions Réglementées (L. 225-38)</span>
-                            </label>
-                            <div class="flex items-center gap-2">
-                                <button type="button" onclick="showHelp('j2')" class="text-blue-600 hover:text-blue-800 font-bold">ℹ️</button>
-                                <select id="jur-j2" onchange="computeLegal()" class="border rounded p-1 text-[11px] font-bold">
-                                    <option value="1">Conforme</option>
-                                    <option value="0.5">Sous Réserves</option>
-                                    <option value="0" selected>Irrégularité</option>
-                                </select>
-                            </div>
-                        </div>
-                        <input type="text" id="jur-j2-note" class="w-full border p-1 rounded text-[11px]" value="Convention d'appui facturée sans accord préalable du CA">
-                    </div>
-
-                    <!-- J3 Probité / Sapin 2 -->
-                    <div class="bg-white p-2.5 rounded border space-y-1">
-                        <div class="flex justify-between items-center">
-                            <label class="flex items-center gap-1.5 font-bold text-slate-800 cursor-pointer">
-                                <input type="checkbox" id="jur-toggle-3" onchange="computeLegal()" checked class="rounded text-blue-600">
-                                <span>J3. Probité & Loi Sapin 2</span>
-                            </label>
-                            <div class="flex items-center gap-2">
-                                <button type="button" onclick="showHelp('j3')" class="text-blue-600 hover:text-blue-800 font-bold">ℹ️</button>
-                                <select id="jur-j3" onchange="computeLegal()" class="border rounded p-1 text-[11px] font-bold">
-                                    <option value="1">Conforme</option>
-                                    <option value="0.5">Sous Réserves</option>
-                                    <option value="0" selected>Irrégularité</option>
-                                </select>
-                            </div>
-                        </div>
-                        <input type="text" id="jur-j3-note" class="w-full border p-1 rounded text-[11px]" value="Absence d'enregistrement formel des déports d'élus en CA">
-                    </div>
-
-                    <!-- J4 Champ exclusif SPL -->
-                    <div class="bg-white p-2.5 rounded border space-y-1">
-                        <div class="flex justify-between items-center">
-                            <label class="flex items-center gap-1.5 font-bold text-slate-800 cursor-pointer">
-                                <input type="checkbox" id="jur-toggle-4" onchange="computeLegal()" checked class="rounded text-blue-600">
-                                <span>J4. Périmètre de Compétence (L. 1531-1)</span>
-                            </label>
-                            <div class="flex items-center gap-2">
-                                <button type="button" onclick="showHelp('j4')" class="text-blue-600 hover:text-blue-800 font-bold">ℹ️</button>
-                                <select id="jur-j4" onchange="computeLegal()" class="border rounded p-1 text-[11px] font-bold">
-                                    <option value="1" selected>Conforme</option>
-                                    <option value="0.5">Sous Réserves</option>
-                                    <option value="0">Irrégularité</option>
-                                </select>
-                            </div>
-                        </div>
-                        <input type="text" id="jur-j4-note" class="w-full border p-1 rounded text-[11px]" value="Actionnariat 100 % public et champ territorial conformes">
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODULE 3 : MATRICE DE GOUVERNANCE OBJECTIVÉE -->
-        <div id="section-mod-quinze" class="space-y-4 mb-8">
-            <div class="border-b pb-2 flex flex-col md:flex-row justify-between items-start md:items-end gap-2">
-                <div>
-                    <h2 class="font-bold text-slate-900 uppercase tracking-wide text-sm border-l-4 border-slate-900 pl-2">
-3. Matrice de Gouvernance & Risques Opérationnels
-                    </h2>
-                    <p class="text-xs text-slate-500 mt-0.5">Cochez les critères vérifiés sur pièces. Le Health Score est recalculé proportionnellement sur base 100.</p>
-                </div>
-                <div class="bg-slate-900 text-white px-3 py-1.5 rounded text-xs font-bold flex items-center gap-2">
-                    <span>Health Score Renormalisé :</span>
-                    <span id="hs-display" class="text-blue-400 text-sm font-black">40</span>
-                    <span class="text-slate-400 text-[10px]">/100</span>
-                    <span id="hs-diag-label" class="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-600 text-white">Vulnérabilité Forte</span>
-                </div>
-            </div>
-
-            <!-- Grille des 5 dimensions -->
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 text-xs">
-                
-                <div id="card-axe-1" class="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col justify-between">
-                    <div>
-                        <div class="flex justify-between items-center mb-2 pb-1 border-b">
-                            <label class="flex items-center gap-1 font-bold text-slate-800 uppercase text-[11px] cursor-pointer">
-                                <input type="checkbox" id="axe-toggle-1" onchange="computeHealthScore()" checked class="rounded text-blue-600">
-                                <span>1. Gouvernance</span>
-                            </label>
-                            <span id="score-axe-1" class="font-black text-blue-900">1,25/5</span>
-                        </div>
-                        <div class="space-y-2">
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-1-1" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Régularité CA/AG (Quorum, PV signés)</span></label>
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-1-2" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Conventions autorisées formellement</span></label>
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-1-3" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Déport effectif des élus au CA</span></label>
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-1-4" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Périmètre statutaire respecté</span></label>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="card-axe-2" class="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col justify-between">
-                    <div>
-                        <div class="flex justify-between items-center mb-2 pb-1 border-b">
-                            <label class="flex items-center gap-1 font-bold text-slate-800 uppercase text-[11px] cursor-pointer">
-                                <input type="checkbox" id="axe-toggle-2" onchange="computeHealthScore()" checked class="rounded text-blue-600">
-                                <span>2. Modèle Éco</span>
-                            </label>
-                            <span id="score-axe-2" class="font-black text-blue-900">0,00/5</span>
-                        </div>
-                        <div class="space-y-2">
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-2-1" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Exploitation équilibrée hors secours</span></label>
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-2-2" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Service dette couvert (DSCR > 1,2)</span></label>
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-2-3" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Dépendance subventions maîtrisée</span></label>
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-2-4" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>BFR d'exploitation sous contrôle</span></label>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="card-axe-3" class="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col justify-between">
-                    <div>
-                        <div class="flex justify-between items-center mb-2 pb-1 border-b">
-                            <label class="flex items-center gap-1 font-bold text-slate-800 uppercase text-[11px] cursor-pointer">
-                                <input type="checkbox" id="axe-toggle-3" onchange="computeHealthScore()" checked class="rounded text-blue-600">
-                                <span>3. Org. & RH</span>
-                            </label>
-                            <span id="score-axe-3" class="font-black text-blue-900">1,25/5</span>
-                        </div>
-                        <div class="space-y-2">
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-3-1" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Vacance structurelle < 5 %</span></label>
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-3-2" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Intérim maîtrisé (< 5 % masse sal.)</span></label>
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-3-3" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Taux d'absentéisme maîtrisé</span></label>
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-3-4" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Organigramme & suppléance actés</span></label>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="card-axe-4" class="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col justify-between">
-                    <div>
-                        <div class="flex justify-between items-center mb-2 pb-1 border-b">
-                            <label class="flex items-center gap-1 font-bold text-slate-800 uppercase text-[11px] cursor-pointer">
-                                <input type="checkbox" id="axe-toggle-4" onchange="computeHealthScore()" checked class="rounded text-blue-600">
-                                <span>4. Usagers</span>
-                            </label>
-                            <span id="score-axe-4" class="font-black text-blue-900">3,75/5</span>
-                        </div>
-                        <div class="space-y-2">
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-4-1" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Volumes réalisés (> 95 %)</span></label>
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-4-2" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Coût unitaire conforme au barème</span></label>
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-4-3" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Satisfaction usagers > 85 %</span></label>
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-4-4" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Faible taux de réclamations</span></label>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="card-axe-5" class="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col justify-between">
-                    <div>
-                        <div class="flex justify-between items-center mb-2 pb-1 border-b">
-                            <label class="flex items-center gap-1 font-bold text-slate-800 uppercase text-[11px] cursor-pointer">
-                                <input type="checkbox" id="axe-toggle-5" onchange="computeHealthScore()" checked class="rounded text-blue-600">
-                                <span>5. Exécution</span>
-                            </label>
-                            <span id="score-axe-5" class="font-black text-blue-900">1,25/5</span>
-                        </div>
-                        <div class="space-y-2">
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-5-1" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Plan d'investissement tenu (CAPEX)</span></label>
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-5-2" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Reporting et délais respectés</span></label>
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-5-3" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Suivi actif des audits antérieurs</span></label>
-                            <label class="flex items-start gap-2 cursor-pointer"><input type="checkbox" id="c-5-4" onchange="computeHealthScore()" class="mt-0.5 rounded text-blue-600"><span>Alignement territorial & RSE</span></label>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-
-        <!-- MODULE 4 : CRITÈRE « AUTRE » -->
-        <div id="section-mod-other" class="bg-amber-50/70 p-5 rounded-xl border border-amber-200 space-y-3 mb-8">
-            <div class="flex justify-between items-center border-b border-amber-200 pb-2">
-                <div>
-                    <h2 class="font-bold text-amber-950 uppercase tracking-wide text-xs">
-4. Fait Majeur ou Signal Faible Spécifique (« Autre »)
-                    </h2>
-                    <p class="text-[11px] text-amber-800">Sujet non capté par la grille standard (Cyber, crise RH, contrôle fiscal, sinistre).</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <label class="text-xs font-bold text-amber-900">Niveau :</label>
-                    <select id="other-impact" onchange="handleOtherImpact()" class="border border-amber-300 rounded p-1 text-xs font-bold bg-white text-amber-900">
-                        <option value="none">Aucun fait majeur</option>
-                        <option value="minor">Mineur (À surveiller)</option>
-                        <option value="major">Majeur (Dégradation opérationnelle)</option>
-                        <option value="blocking" selected>Bloquant (Active l'Alerte Rouge)</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                <div>
-                    <label class="block font-semibold mb-1 text-slate-700">Intitulé de l'événement</label>
-                    <input type="text" id="other-title" class="w-full border p-2 rounded bg-white" value="Crise managériale aiguë et vacance de la direction générale">
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block font-semibold mb-1 text-slate-700">Conséquences prévisibles pour la collectivité</label>
-                    <input type="text" id="other-desc" class="w-full border p-2 rounded bg-white" value="Absence de pilotage exécutif depuis 4 mois et retards critiques dans la facturation des usagers">
-                </div>
-            </div>
-        </div>
-
-        <!-- ÉTAPE 5 : DÉCISION D'ARBITRAGE -->
-        <div class="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4 mb-8">
-            <div class="border-b pb-2">
-                <h2 class="font-bold text-slate-900 uppercase tracking-wide text-sm border-l-4 border-blue-600 pl-2">
-5. Décision d'Arbitrage & Préconisations Soumises au Vote
-                </h2>
-                <p class="text-xs text-slate-500 mt-0.5">Formulez la décision motivée et opposable que l'Assemblée délibérante doit acter.</p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
-                <div>
-                    <label class="block font-semibold mb-1">Option d'arbitrage</label>
-                    <select id="arb-choice" class="w-full border p-2 rounded bg-white font-bold text-blue-900">
-                        <option value="Scénario A : Maintien sous condition stricte">Scénario A : Maintien sous condition stricte</option>
-                        <option value="Scénario B : Restructuration opérationnelle immédiate" selected>Scénario B : Restructuration opérationnelle immédiate</option>
-                        <option value="Scénario C : Injonction de retour à l'équilibre (Zéro concours)">Scénario C : Injonction de retour à l'équilibre (Zéro concours)</option>
-                        <option value="Scénario Moratoire : Suspension conservatoire des versements">Scénario Moratoire : Suspension conservatoire des versements</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block font-semibold mb-1 text-green-700">Impact Financier attendu (€)</label>
-                    <input type="text" id="arb-impact-fin" class="w-full border p-2 rounded bg-white font-medium" value="+ 240 k€ / an (économies)">
-                </div>
-                <div>
-                    <label class="block font-semibold mb-1 text-blue-700">Levier Social & Ressources Humaines</label>
-                    <input type="text" id="arb-impact-rh" class="w-full border p-2 rounded bg-white font-medium" value="Titularisation chauffeurs & baisse intérim de 60 %">
-                </div>
-                <div>
-                    <label class="block font-semibold mb-1 text-amber-700">Cotation du Risque Politique</label>
-                    <select id="arb-risk-pol" class="w-full border p-2 rounded bg-white font-bold text-amber-900">
-                        <option value="Faible - Mesure consensuelle">Faible - Mesure consensuelle</option>
-                        <option value="Modéré - Explicable en séance" selected>Modéré - Explicable en séance</option>
-                        <option value="Élevé - Tension locale à anticiper">Élevé - Tension locale à anticiper</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="text-xs">
-                <label class="block font-semibold mb-1">Exposé des motifs pour la délibération (Texte officiel)</label>
-                <textarea id="arb-text" rows="3" class="w-full border p-2.5 rounded bg-white text-slate-800" placeholder="Exposé des motifs..."></textarea>
-            </div>
-        </div>
-
-        <button onclick="renderTBI()" class="w-full bg-slate-900 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-lg transition duration-200 text-sm tracking-wide uppercase shadow-lg">
-            Générer l'Aperçu du Tableau de Bord d'Impact (Spécimen Démo)
-        </button>
-        
-        </div>
-    </div>
-
-    <!-- MODALE PÉDAGOGIQUE & FICHES RÉFLEXES -->
-    <div id="help-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 no-print">
-        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4 border border-slate-200">
-            <div class="flex justify-between items-start border-b pb-3">
-                <div>
-                    <span id="help-badge" class="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-800">Fiche Réflexe</span>
-                    <h3 id="help-title" class="text-lg font-bold text-slate-900 mt-1">--</h3>
-                </div>
-                <button type="button" onclick="closeHelp()" class="text-slate-400 hover:text-slate-600 text-xl font-black">✕</button>
-            </div>
-            
-            <div class="space-y-3 text-xs leading-relaxed text-slate-700">
-                <div>
-                    <h4 class="font-bold text-slate-900 uppercase text-[11px] mb-0.5">Définition :</h4>
-                    <p id="help-def" class="bg-slate-50 p-2.5 rounded border">--</p>
-                </div>
-                <div>
-                    <h4 class="font-bold text-slate-900 uppercase text-[11px] mb-0.5">Mode de calcul :</h4>
-                    <p id="help-calc" class="font-mono text-blue-900 bg-blue-50 p-2 rounded border border-blue-200">--</p>
-                </div>
-                <div>
-                    <h4 class="font-bold text-slate-900 uppercase text-[11px] mb-0.5">Normes Sectorielles :</h4>
-                    <p id="help-norm" class="text-slate-800 bg-amber-50/70 p-2.5 rounded border border-amber-200">--</p>
-                </div>
-                <div>
-                    <h4 class="font-bold text-slate-900 uppercase text-[11px] mb-0.5">Conséquence pour la collectivité :</h4>
-                    <p id="help-impact" class="text-slate-700 italic">--</p>
-                </div>
-            </div>
-
-            <div class="pt-2 text-right">
-                <button type="button" onclick="closeHelp()" class="bg-slate-900 hover:bg-slate-800 text-white font-bold py-2 px-5 rounded text-xs">
-                    Fermer
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- RENDU FINAL : TBI-RU RECTO UNIQUE (FILIGRANÉ DÉMONSTRATION) -->
-    <div id="output-section" class="hidden bg-white p-8 rounded-xl shadow-2xl mt-4 print-container border border-slate-300">
-        
-        <!-- FILIGRANE DÉMONSTRATION NON OPPOSABLE -->
-        <div class="mb-5 p-3 bg-amber-100 border-2 border-amber-500 text-amber-950 rounded-lg text-center">
-            <div class="text-xs font-black uppercase tracking-widest">
-                ⚠️ Spécimen de démonstration — Document non opposable (Données fictives)
-            </div>
-        </div>
-
-        <!-- BANDEAU D'ALERTE ROUGE -->
-        <div id="tbi-red-banner" class="hidden mb-6 p-4 bg-red-600 text-white rounded-lg shadow-lg border-2 border-red-700">
-            <div class="flex items-center gap-3">
-                <span class="text-3xl">⛔</span>
-                <div>
-                    <div class="text-sm font-black uppercase tracking-wider">Alerte Rouge Déclassante - Moratoire Immédiat Recommandé</div>
-                    <div class="text-xs font-medium text-red-100 mt-0.5" id="tbi-red-banner-desc">--</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- En-tête officiel TBI -->
-        <div class="border-b-4 border-slate-900 pb-4 mb-6 flex justify-between items-start">
-            <div>
-                <div class="flex items-center gap-3">
-                    <span class="bg-slate-900 text-white px-2.5 py-1 text-sm font-black rounded tracking-widest">TBI-RU</span>
-                    <h1 class="text-xl font-black text-slate-900 uppercase">Tableau de Bord d'Impact - Recto Unique</h1>
-                </div>
-                <div class="text-xs text-slate-600 font-semibold mt-1">
-                    Structure : <span id="tbi-out-entity" class="font-black text-slate-900">--</span> | Tutelle : <span id="tbi-out-authority">--</span>
-                </div>
-                <div class="text-[11px] text-slate-500 font-medium mt-0.5">
-                    Instance : <span id="tbi-out-instance">--</span> | <span id="tbi-out-scope-desc" class="font-bold text-blue-900">Périmètre complet</span>
-                </div>
-            </div>
-            <div class="text-right">
-                <div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Doctrine d'Arbitrage Satellites</div>
-                <div class="text-[10px] text-slate-400 mt-1" id="tbi-out-date">--</div>
-            </div>
-        </div>
-
-        <!-- Grille Principale Dynamique -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="tbi-main-grid">
-            
-            <!-- COLONNE GAUCHE -->
-            <div id="tbi-col-left" class="col-span-1 bg-slate-50 p-5 rounded-lg border-l-4 border-slate-900 flex flex-col justify-between">
-                <div>
-                    <div id="tbi-box-hs">
-                        <div class="text-[11px] uppercase text-slate-500 font-black tracking-wider mb-2">Health Score Renormalisé</div>
-                        <div class="text-5xl font-black text-slate-900 text-center my-2" id="tbi-out-hs">--</div>
-                        <div class="text-center py-1.5 px-2 rounded text-xs font-black uppercase mb-4" id="tbi-out-hs-badge">--</div>
-                        
-                        <div class="text-[10px] uppercase text-slate-400 font-bold border-t pt-3 mb-2">Scores des Axes Audités (/5) :</div>
-                        <div class="space-y-1.5 text-[11px] text-slate-600 font-medium" id="tbi-radar-list"></div>
-                    </div>
-                    <div id="tbi-box-hs-off" class="hidden text-xs text-slate-500 italic p-3 bg-white rounded border text-center">
-                        Matrice de gouvernance hors champ du mandat.
-                    </div>
-                </div>
-
-                <div id="tbi-box-legal" class="border-t border-slate-200 pt-3 mt-4 space-y-2">
-                    <div>
-                        <div class="text-[10px] uppercase text-slate-500 font-black tracking-wider mb-1">Conformité Légale :</div>
-                        <div id="tbi-out-legal-badge" class="text-xs font-black uppercase py-1 px-2 rounded text-center">--</div>
-                    </div>
-                    <p class="text-[11px] text-slate-700 leading-tight italic" id="tbi-out-legal-summary">--</p>
-                </div>
-            </div>
-
-            <!-- COLONNE DROITE -->
-            <div id="tbi-col-right" class="col-span-2 space-y-5 flex flex-col justify-between">
-                
-                <div id="tbi-box-fin" class="space-y-2">
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs uppercase text-slate-500 font-black tracking-wider">Équilibres Financiers & Comparatif Sectoriel</span>
-                        <span id="tbi-out-sector-tag" class="text-[10px] font-bold text-slate-500 uppercase">--</span>
-                    </div>
-
-                    <table class="w-full text-left border-collapse text-xs">
-                        <thead>
-                            <tr class="bg-slate-100 text-[10px] uppercase text-slate-600 border-b">
-                                <th class="p-2 font-bold">Indicateur Financier</th>
-                                <th class="p-2 font-bold text-right">Réalisé N-1</th>
-                                <th class="p-2 font-bold">Norme / Moyenne Sectorielle</th>
-                                <th class="p-2 font-bold text-center">Alerte</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-200 text-[11px]">
-                            <tr>
-                                <td class="p-2 font-semibold">Chiffre d'Affaires réalisé</td>
-                                <td class="p-2 font-black text-right" id="tbi-row-ca">--</td>
-                                <td class="p-2 text-slate-600" id="tbi-row-ca-norm">Activité contractuelle attendue</td>
-                                <td class="p-2 text-center" id="tbi-row-ca-alert">🟢</td>
-                            </tr>
-                            <tr>
-                                <td class="p-2 font-semibold">Fonds de Roulement (FRNG)</td>
-                                <td class="p-2 font-black text-right" id="tbi-row-frng">--</td>
-                                <td class="p-2 text-slate-600" id="tbi-row-frng-norm">> 250 k€ (ou 6-8 % du CA)</td>
-                                <td class="p-2 text-center" id="tbi-row-frng-alert">--</td>
-                            </tr>
-                            <tr>
-                                <td class="p-2 font-semibold">Besoin en Fonds de Roulement (BFR)</td>
-                                <td class="p-2 font-black text-right" id="tbi-row-bfr">--</td>
-                                <td class="p-2 text-slate-600" id="tbi-row-bfr-norm">Moyenne : ~15 à 20 jours de CA</td>
-                                <td class="p-2 text-center" id="tbi-row-bfr-alert">--</td>
-                            </tr>
-                            <tr>
-                                <td class="p-2 font-semibold">Trésorerie Nette à la clôture</td>
-                                <td class="p-2 font-black text-right" id="tbi-row-treso">--</td>
-                                <td class="p-2 text-slate-600">Seuil de sécurité : > 0 €</td>
-                                <td class="p-2 text-center" id="tbi-row-treso-alert">--</td>
-                            </tr>
-                            <tr>
-                                <td class="p-2 font-semibold">Capacité de désendettement (Dette/CAF)</td>
-                                <td class="p-2 font-black text-right" id="tbi-row-ratio">--</td>
-                                <td class="p-2 text-slate-600" id="tbi-row-ratio-norm">Seuil d'alerte critique : 5 années</td>
-                                <td class="p-2 text-center" id="tbi-row-ratio-alert">--</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <div class="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-900 flex justify-between items-center">
-                        <span class="font-bold">Risque hors-bilan (Garantie d'emprunt accordée) :</span>
-                        <span class="font-black text-sm" id="tbi-out-garantie">--</span>
-                    </div>
-                </div>
-
-                <div id="tbi-box-other" class="bg-amber-50 p-3 rounded border border-amber-200 text-xs">
-                    <div class="flex justify-between items-center mb-1">
-                        <span class="font-black text-amber-900 uppercase text-[10px] tracking-wide">Fait Majeur / Signal Faible :</span>
-                        <span id="tbi-out-other-impact" class="font-bold text-[10px] px-1.5 py-0.2 rounded bg-amber-200 text-amber-900">--</span>
-                    </div>
-                    <div class="font-bold text-slate-900" id="tbi-out-other-title">--</div>
-                    <p class="text-slate-600 text-[11px] mt-0.5" id="tbi-out-other-desc">--</p>
-                </div>
-
-                <div>
-                    <div class="text-xs uppercase text-slate-500 font-black tracking-wider mb-2">Orientation & Décision d'Arbitrage Soumise au Vote</div>
-                    <div class="bg-slate-900 text-white p-3.5 rounded-lg">
-                        <div class="text-xs font-bold text-blue-300 uppercase tracking-wide mb-1" id="tbi-out-arb-choice">--</div>
-                        <p class="text-xs leading-relaxed text-slate-200 italic" id="tbi-out-arb-text">--</p>
-                    </div>
-
-                    <div class="grid grid-cols-3 gap-2.5 mt-2.5 text-center">
-                        <div class="p-2 bg-green-50 rounded border border-green-200">
-                            <div class="text-[9px] font-bold text-green-700 uppercase">Impact Financier</div>
-                            <div class="text-xs font-black text-green-800" id="tbi-out-imp-fin">--</div>
-                        </div>
-                        <div class="p-2 bg-blue-50 rounded border border-blue-200">
-                            <div class="text-[9px] font-bold text-blue-700 uppercase">Volet RH / Social</div>
-                            <div class="text-xs font-black text-blue-800" id="tbi-out-imp-rh">--</div>
-                        </div>
-                        <div class="p-2 bg-amber-50 rounded border border-amber-200">
-                            <div class="text-[9px] font-bold text-amber-700 uppercase">Risque Politique</div>
-                            <div class="text-xs font-black text-amber-800" id="tbi-out-risk-pol">--</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="mt-5 pt-2 border-t border-amber-300 text-center text-[10px] font-bold uppercase text-amber-800">
-            Archétype Satellites — Version de démonstration interactive (Usage commercial ou délibératif interdit)
-        </div>
-
-        <div class="mt-4 pt-4 border-t text-center no-print flex justify-center gap-4">
-            <button onclick="window.print()" class="bg-blue-900 hover:bg-blue-800 text-white text-xs font-bold py-2.5 px-6 rounded shadow">
-                🖨️ Aperçu Impression (Spécimen filigrané)
-            </button>
-            <button onclick="backToEdit()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold py-2.5 px-6 rounded shadow">
-                ✏️ Revenir aux paramètres de test
-            </button>
-        </div>
-    </div>
-</div>
-
-<script>
-    function demoRestrictedNotice() {
-        alert("Mode démonstration : la sauvegarde dans le Cloud et la création de nouveaux dossiers sont réservées à la version sous licence.");
+    return {
+        "fichier": name, "annee": annee,
+        "f_74": f_74, "c_756": c_756, "a_70": a_70, "aut_p": aut_p, "tp": tp,
+        "ach_60": ach_60, "loy_613": loy_613, "maint_615": maint_615, "aut_ext": aut_ext,
+        "ms_64": ms_64, "fin_66": fin_66, "amo_68": amo_68, "tc": tc,
+        "rn": tp - tc, "caf": (tp - tc) + amo_68,
+        "dette": dette_16, "remb": remb_16, "tres": tres_51
     }
 
-    // --- BASE DE CONNAISSANCES & FICHES RÉFLEXES ENRICHIE ---
-    const helpDatabase = {
-        moteurGlobal: {
-            title: "Mécanique du Moteur Financier & Bilanciel",
-            badge: "Doctrine d'Audit",
-            def: "L'analyse repose sur le triptyque de l'analyse bilancielle : FRNG - BFR = Trésorerie Nette, complété par la capacité de désendettement (Dette / CAF) et le risque hors-bilan.",
-            calc: "1. FRNG = Ressources Durables - Emplois Stables\n2. BFR = Actif Circulant - Passif Circulant\n3. Trésorerie = FRNG - BFR",
-            norm: "Le FRNG doit être strictement positif et couvrir intégralement le BFR pour garantir une trésorerie saine (> 0 €) sans dépendance aux découverts bancaires.",
-            impact: "Alerte immédiatement les élus et le DGS si la structure vit à crédit ou risque d'appeler la garantie d'emprunt de la collectivité."
-        },
-        ca: {
-            title: "Chiffre d'Affaires HT (CA)",
-            badge: "Activité Économique",
-            def: "Montant total hors taxes des prestations facturées, ventes d'usagers et recettes d'exploitation sur l'exercice.",
-            calc: "Total des comptes 70 du plan comptable général (PCG)",
-            norm: "Doit couvrir a minima 35 à 45 % des charges d'exploitation dans le transport public sous DSP, 80 % en aménagement.",
-            impact: "Un recul du CA combiné à des charges fixes rigides provoque immédiatement un effet de ciseau budgétaire."
-        },
-        caf: {
-            title: "Capacité d'Autofinancement (CAF)",
-            badge: "Rentabilité Réelle",
-            def: "Surplus monétaire réel généré par l'activité opérationnelle permettant de renouveler les investissements et de rembourser la dette bancaire.",
-            calc: "EBE + Autres produits encaissables - Autres charges décaissables",
-            norm: "Moyenne sectorielle : 6 à 10 % du chiffre d'affaires annuel.",
-            impact: "Une CAF négative ou proche de zéro rend le satellite incapable d'honorer ses annuités sans secours financier de la collectivité."
-        },
-        ressources: {
-            title: "Ressources Durables (Haut de Bilan - Passif)",
-            badge: "Financement Stable",
-            def: "Capitaux permanents restant à disposition de l'organisme sur plus d'un an : capital social, réserves, provisions pour risques, subventions d'investissement et emprunts bancaires à moyen/long terme.",
-            calc: "Capitaux Propres + Provisions Long Terme + Dettes Financières MLT (Comptes 10 à 16)",
-            norm: "Doivent toujours être supérieures aux emplois stables pour dégager un FRNG protecteur.",
-            impact: "Une insuffisance de ressources durables fragilise l'ensemble de la structure bilancielle et oblige à financer des immobilisations par du court terme."
-        },
-        emplois: {
-            title: "Emplois Stables (Haut de Bilan - Actif)",
-            badge: "Actifs Immobilisés",
-            def: "Ensemble des investissements durables nécessaires au fonctionnement du service : matériel roulant, bus, terrains, réseaux, équipements et immobilisations financières.",
-            calc: "Total de l'Actif Immobilisé Brut (Classe 2 du plan comptable)",
-            norm: "Doivent être financés exclusivement par des ressources de long terme (emprunts bancaires + fonds propres).",
-            impact: "Financer des actifs stables avec des découverts bancaires ou du crédit fournisseur conduit à court terme à la cessation de paiements."
-        },
-        actifCirc: {
-            title: "Actif Circulant (Exploitation)",
-            badge: "Cycle d'Exploitation",
-            def: "Créances clients/usagers en attente d'encaissement, créances de subventions notifiées, avances accordées et stocks de fournitures.",
-            calc: "Stocks + Créances usagers et collectivités tutrices (Comptes 3 et 4 de l'actif)",
-            norm: "Doit être encaissé dans les délais contractuels légaux (30 à 60 jours maximum).",
-            impact: "Un gonflement de l'actif circulant dénote des impayés d'usagers, des litiges de facturation ou des retards administratifs de versement des subventions."
-        },
-        passifCirc: {
-            title: "Passif Circulant (Dettes d'Exploitation)",
-            badge: "Cycle d'Exploitation",
-            def: "Dettes court terme non financières contractées auprès des fournisseurs, sous-traitants, organismes sociaux (URSSAF) et administration fiscale.",
-            calc: "Dettes Fournisseurs + Dettes Fiscales et Sociales (Comptes 4 du passif)",
-            norm: "Délais de règlement fournisseurs alignés sur les obligations légales LME (45 à 60 jours maximum).",
-            impact: "Une accumulation anormale signale des retards de paiement imposés aux sous-traitants par manque de liquidités et un risque d'assignation."
-        },
-        dette: {
-            title: "Dette Financière Brute (Passif Stable)",
-            badge: "Endettement Bancaire",
-            def: "Total du capital restant dû sur les emprunts contractés auprès des banques et des avances remboursables octroyées par la collectivité.",
-            calc: "Emprunts bancaires MLT + Avances en compte courant d'associé (Comptes 16)",
-            norm: "Ratio Dette / CAF ne devant pas excéder 4 à 5 années de CAF.",
-            impact: "Sert de base directe au calcul de l'exposition hors-bilan de la collectivité si une garantie d'emprunt a été accordée."
-        },
-        frng: {
-            title: "Fonds de Roulement Net Global (FRNG)",
-            badge: "Solvabilité Long Terme",
-            def: "Excédent des capitaux stables sur les immobilisations. Il constitue le matelas financier de sécurité permanent.",
-            calc: "Ressources Durables - Emplois Stables",
-            norm: "Doit toujours être strictement positif (> 0 €) et représenter entre 6 et 15 % du CA selon le secteur d'activité.",
-            impact: "Un FRNG négatif indique que la structure finance des actifs durables au moyen de dettes à court terme."
-        },
-        bfr: {
-            title: "Besoin en Fonds de Roulement (BFR)",
-            badge: "Décalage d'Exploitation",
-            def: "Montant gelé dans le décalage quotidien entre ce que la structure doit décaisser pour fonctionner et ce qu'elle encaisse des usagers.",
-            calc: "Actif Circulant (Créances + Stocks) - Passif Circulant (Dettes CT)",
-            norm: "Transport : 15 à 20 jours de CA. Aménagement foncier : 45 à 90 jours de CA.",
-            impact: "Si le BFR s'envole, il absorbe l'intégralité de la trésorerie même si l'exploitation dégage un résultat comptable positif."
-        },
-        treso: {
-            title: "Trésorerie Nette à la Clôture",
-            badge: "Liquidité Immédiate",
-            def: "Fonds immédiatement disponibles sur les comptes bancaires après compensation des découverts et facilités de caisse.",
-            calc: "FRNG - BFR (ou Disponibilités bancaires - Concours bancaires courants)",
-            norm: "Seuil impératif : > 0 €. Idéalement un matelas équivalent à 30 à 45 jours de charges de fonctionnement.",
-            impact: "Une trésorerie négative et durable conduit directement à la cessation de paiements et à la nomination d'un administrateur judiciaire."
-        },
-        ratioDette: {
-            title: "Capacité de Désendettement (Dette / CAF)",
-            badge: "Surveillance Prudentielle",
-            def: "Nombre théorique d'années nécessaires pour rembourser l'intégralité de la dette en y consacrant 100 % de la CAF annuelle.",
-            calc: "Dette Financière Brute / Capacité d'Autofinancement (CAF)",
-            norm: "Sain : < 4 ans | Vigilance : 4 à 5 ans | Seuil critique d'alerte : > 5 années (7 ans en aménagement).",
-            impact: "Au-delà du seuil critique, la structure ne peut plus se refinancer sans injection de fonds publics."
-        },
-        garantie: {
-            title: "Garantie d'Emprunt Accordée par la Collectivité",
-            badge: "Risque Hors-Bilan",
-            def: "Engagement juridique pris par la collectivité de se substituer au satellite défaillant pour rembourser les échéances bancaires.",
-            calc: "Dette Financière Brute x Pourcentage garanti par délibération",
-            norm: "Encadrement strict par le Code général des collectivités territoriales (règles de division des risques).",
-            impact: "L'activation de la garantie entraîne l'inscription immédiate d'une dépense obligatoire au budget primitif de la collectivité."
-        },
-        j1: {
-            title: "Commande Publique & Avenants",
-            badge: "Sécurité Juridique",
-            def: "Contrôle du respect des règles de passation, des seuils de publicité et des limites apportées aux avenants contractuels.",
-            calc: "Avenants limités à 50 % du montant initial du contrat sans modification substantielle de l'objet.",
-            norm: "Traçabilité intégrale des motifs techniques et financiers justifiant chaque avenant.",
-            impact: "Un avenant jugé illégal expose au risque d'annulation contentieuse et de remboursement des sommes versées."
-        },
-        j2: {
-            title: "Conventions Réglementées (Art. L. 225-38)",
-            badge: "Gouvernance & Probité",
-            def: "Procédure d'autorisation préalable pour toute convention passée entre le satellite et une structure où un administrateur détient des intérêts.",
-            calc: "Autorisation préalable du conseil d'administration + avis spécial du commissaire aux comptes.",
-            norm: "Zéro convention conclue sans délibération formelle préalable.",
-            impact: "L'omission de cette formalité peut engager la responsabilité civile et pénale des administrateurs pour prise illégale d'intérêts."
-        },
-        j3: {
-            title: "Déport des Élus & Prévention Pénale (Sapin 2)",
-            badge: "Prévention Pénale",
-            def: "Obligation stricte pour les élus désignés administrateurs de ne participer ni aux débats ni aux votes lors de l'octroi d'aides ou de contrats à la structure.",
-            calc: "Mention expresse et nominative du déport inscrite au procès-verbal de séance.",
-            norm: "Application de l'article 432-12 du Code pénal (jurisprudence constante de la Cour de cassation).",
-            impact: "Le défaut de déport matérialise le délit pénal de prise illégale d'intérêts pour les élus concernés."
-        },
-        j4: {
-            title: "Périmètre de Compétence des SPL (Art. L. 1531-1 CGCT)",
-            badge: "Régime Quasi-Régie",
-            def: "Une Société Publique Locale ne peut travailler que pour le compte exclusif de ses collectivités actionnaires et sur leur seul territoire géographique.",
-            calc: "Actionnariat : 100 % public | Chiffre d'affaires hors actionnaires : 0 %.",
-            norm: "Contrôle analogue exercé conjointement par l'ensemble des membres actionnaires.",
-            impact: "Toute prestation réalisée au profit d'un tiers privé est frappée de nullité absolue."
-        }
-    };
-
-    const sectorBenchmarks = {
-        transport: { label: "Transport Public Local (DSP / SEM)", frngNormTxt: "> 250 k€ (ou 6-8 % du CA)", bfrDays: 18, ratioMax: 5.0 },
-        amenagement: { label: "Aménagement & Logement (SPL / SEM)", frngNormTxt: "> 10-15 % du CA pour le foncier", bfrDays: 60, ratioMax: 6.5 },
-        medicosocial: { label: "Médico-social & Santé (M22 / CPOM)", frngNormTxt: "15 jours de charges réelles", bfrDays: 25, ratioMax: 4.0 },
-        general: { label: "Association / Entreprise Générale", frngNormTxt: "> 0 € (positif)", bfrDays: 30, ratioMax: 5.0 }
-    };
-
-    function showHelp(topic) {
-        const item = helpDatabase[topic];
-        if (!item) return;
-        document.getElementById('help-title').innerText = item.title;
-        document.getElementById('help-badge').innerText = item.badge;
-        document.getElementById('help-def').innerText = item.def;
-        document.getElementById('help-calc').innerText = item.calc;
-        document.getElementById('help-norm').innerText = item.norm;
-        document.getElementById('help-impact').innerText = item.impact;
-        document.getElementById('help-modal').classList.remove('hidden');
-    }
-
-    function closeHelp() {
-        document.getElementById('help-modal').classList.add('hidden');
-    }
-
-    const templates = {
-        adour: {
-            entity: "SEM Adour Mobilité Rurale",
-            authority: "Conseil Départemental des Landes",
-            instance: "Commission Permanente (Séance DM2)",
-            sector: "transport",
-            modules: { fin: true, jur: true, quinze: true, other: true },
-            redFlag: true,
-            redFlagReason: "Risque avéré de prise illégale d'intérêts et vice de forme sur l'Avenant n°3 DSP",
-            ca: 4200, caf: 110, ressources: 3100, emplois: 3220, actifCirc: 840, passifCirc: 690, dette: 2800, garantiePct: 80,
-            legalToggles: [true, true, true, true],
-            legalVals: ["0", "0", "0", "1"],
-            legalNotes: ["Avenant n°3 modifiant les tarifs sans base légale solide", "Convention d'appui facturée sans accord préalable du CA", "Absence d'enregistrement formel des déports d'élus en CA", "Actionnariat 100 % public et champ territorial conformes"],
-            axeToggles: [true, true, true, true, true],
-            checks: [true, false, false, false, false, false, false, false, false, false, false, true, true, false, true, true, false, true, false, false],
-            other: { impact: "blocking", title: "Crise managériale aiguë et vacance de la direction générale", desc: "Absence de pilotage exécutif depuis 4 mois et retards critiques de facturation." },
-            arbChoice: "Scénario Moratoire : Suspension conservatoire des versements",
-            impactFin: "Moratoire sur l'avance d'associé de 200 k€",
-            impactRh: "Injonction de nomination d'une direction par intérim",
-            riskPol: "Modéré - Explicable en séance",
-            arbText: "Conditionner formellement le vote de toute aide financière ou avance en compte courant à la purge intégrale du vice de forme de l'Avenant n°3 et à la régularisation des déports d'élus sous 60 jours."
-        },
-        amenagement: {
-            entity: "SPL Grand Sud Aménagement",
-            authority: "Région Occitanie",
-            instance: "Comité d'Audit Régional",
-            sector: "amenagement",
-            modules: { fin: true, jur: true, quinze: true, other: false },
-            redFlag: false,
-            redFlagReason: "",
-            ca: 12500, caf: 820, ressources: 9400, emplois: 8900, actifCirc: 3400, passifCirc: 2800, dette: 6200, garantiePct: 50,
-            legalToggles: [true, true, true, true],
-            legalVals: ["1", "1", "1", "1"],
-            legalNotes: ["Marchés VRD conformes", "Conventions approuvées", "Déports actés", "Champ exclusif 100 % respecté"],
-            axeToggles: [true, true, true, true, true],
-            checks: Array(20).fill(true),
-            other: { impact: "none", title: "", desc: "" },
-            arbChoice: "Scénario A : Maintien sous condition stricte",
-            impactFin: "Soutenance de la dette sur 7,5 ans",
-            impactRh: "Effectifs techniques stables",
-            riskPol: "Faible - Mesure consensuelle",
-            arbText: "La structure dégage une CAF positive permettant d'absorber le portage foncier. Maintien des concours financiers recommandé."
-        },
-        esms: {
-            entity: "Association ESMS Le Bois Fleuri",
-            authority: "Conseil Départemental / ARS",
-            instance: "Commission Tarification M22",
-            sector: "medicosocial",
-            modules: { fin: true, jur: true, quinze: true, other: true },
-            redFlag: true,
-            redFlagReason: "Défaut d'étanchéité des sections tarifaires M22 et absence de CPOM opposable",
-            ca: 3800, caf: -45, ressources: 1200, emplois: 1450, actifCirc: 310, passifCirc: 480, dette: 1600, garantiePct: 50,
-            legalToggles: [true, true, true, true],
-            legalVals: ["0.5", "0", "0.5", "0.5"],
-            legalNotes: ["Intérim non mis en concurrence", "Transferts indus de charges M22", "Déports non documentés", "Caducité du CPOM"],
-            axeToggles: [true, true, true, true, true],
-            checks: [true, false, false, false, false, false, false, false, false, false, false, false, true, true, true, false, false, false, false, false],
-            other: { impact: "major", title: "Absentéisme RH critique (> 22 %)", desc: "Péril sur la continuité des soins et surconsommation d'intérim non budgétée." },
-            arbChoice: "Scénario C : Injonction de retour à l'équilibre (Zéro concours)",
-            impactFin: "Plan d'économies de 180 k€ sous 12 mois",
-            impactRh: "Audit clinique de l'absentéisme et gel du recours intérimaire",
-            riskPol: "Élevé - Tension locale à anticiper",
-            arbText: "Refus de toute dotation non compensée sans signature préalable d'un protocole de redressement de gestion et renouvellement des organes de direction."
-        }
-    };
-
-    function toggleModule(mod) {
-        const isChecked = document.getElementById('mod-toggle-' + mod).checked;
-        const sec = document.getElementById('section-mod-' + mod);
-        if (sec) {
-            sec.style.display = isChecked ? 'block' : 'none';
-        }
-        computeHealthScore();
-        computeLegal();
-        computeFinances();
-    }
-
-    function loadCaseTemplate() {
-        const key = document.getElementById('case-selector').value;
-        const d = templates[key] || templates.adour;
-
-        document.getElementById('current-dossier-label').innerText = d.entity + " (Cas fictif)";
-        document.getElementById('cfg-entity').value = d.entity;
-        document.getElementById('cfg-authority').value = d.authority;
-        document.getElementById('cfg-instance').value = d.instance;
-        document.getElementById('cfg-sector').value = d.sector;
-
-        document.getElementById('mod-toggle-fin').checked = d.modules.fin;
-        document.getElementById('mod-toggle-jur').checked = d.modules.jur;
-        document.getElementById('mod-toggle-quinze').checked = d.modules.quinze;
-        document.getElementById('mod-toggle-other').checked = d.modules.other;
-        toggleModule('fin'); toggleModule('jur'); toggleModule('quinze'); toggleModule('other');
-
-        const rfToggle = document.getElementById('red-flag-toggle');
-        rfToggle.checked = d.redFlag;
-        document.getElementById('red-flag-reason').value = d.redFlagReason;
-        toggleRedFlag();
-
-        document.getElementById('fn-ca').value = d.ca;
-        document.getElementById('fn-caf').value = d.caf;
-        document.getElementById('fn-ressources').value = d.ressources;
-        document.getElementById('fn-emplois').value = d.emplois;
-        document.getElementById('fn-actif-circ').value = d.actifCirc;
-        document.getElementById('fn-passif-circ').value = d.passifCirc;
-        document.getElementById('fn-dette').value = d.dette;
-        document.getElementById('fn-garantie-pct').value = d.garantiePct;
-
-        for (let i = 1; i <= 4; i++) {
-            document.getElementById('jur-toggle-' + i).checked = d.legalToggles[i - 1];
-            document.getElementById('jur-j' + i).value = d.legalVals[i - 1];
-            document.getElementById('jur-j' + i + '-note').value = d.legalNotes[i - 1];
-        }
-
-        for (let i = 1; i <= 5; i++) {
-            document.getElementById('axe-toggle-' + i).checked = d.axeToggles[i - 1];
-        }
-        d.checks.forEach((val, idx) => {
-            const axe = Math.floor(idx / 4) + 1;
-            const c = (idx % 4) + 1;
-            document.getElementById(`c-${axe}-${c}`).checked = val;
-        });
-
-        document.getElementById('other-impact').value = d.other.impact;
-        document.getElementById('other-title').value = d.other.title;
-        document.getElementById('other-desc').value = d.other.desc;
-
-        document.getElementById('arb-choice').value = d.arbChoice;
-        document.getElementById('arb-impact-fin').value = d.impactFin;
-        document.getElementById('arb-impact-rh').value = d.impactRh;
-        document.getElementById('arb-risk-pol').value = d.riskPol;
-        document.getElementById('arb-text').value = d.arbText;
-
-        computeFinances();
-        computeLegal();
-        computeHealthScore();
-    }
-
-    function toggleRedFlag() {
-        const isChecked = document.getElementById('red-flag-toggle').checked;
-        const container = document.getElementById('red-flag-reason-container');
-        const lbl = document.getElementById('red-flag-status-label');
-        if (isChecked) {
-            container.classList.remove('hidden');
-            lbl.innerText = "ACTIF (DÉCLASSANT)";
-            lbl.className = "text-xs font-black text-red-600 uppercase";
-        } else {
-            container.classList.add('hidden');
-            lbl.innerText = "Inactif";
-            lbl.className = "text-xs font-black text-slate-500 uppercase";
-        }
-    }
-
-    function handleOtherImpact() {
-        const val = document.getElementById('other-impact').value;
-        if (val === 'blocking') {
-            document.getElementById('red-flag-toggle').checked = true;
-            toggleRedFlag();
-        }
-    }
-
-    let calculatedFinances = {};
-
-    function computeFinances() {
-        if (!document.getElementById('mod-toggle-fin').checked) {
-            calculatedFinances = { ca: 0, caf: 0, frng: 0, bfr: 0, treso: 0, dette: 0, ratioDette: "N/A", montantGarantie: 0, garantiePct: 0 };
-            return;
-        }
-        const ca = parseFloat(document.getElementById('fn-ca').value) || 0;
-        const caf = parseFloat(document.getElementById('fn-caf').value) || 0;
-        const ressources = parseFloat(document.getElementById('fn-ressources').value) || 0;
-        const emplois = parseFloat(document.getElementById('fn-emplois').value) || 0;
-        const actifCirc = parseFloat(document.getElementById('fn-actif-circ').value) || 0;
-        const passifCirc = parseFloat(document.getElementById('fn-passif-circ').value) || 0;
-        const dette = parseFloat(document.getElementById('fn-dette').value) || 0;
-        const garantiePct = parseFloat(document.getElementById('fn-garantie-pct').value) || 0;
-
-        const frng = ressources - emplois;
-        const bfr = actifCirc - passifCirc;
-        const treso = frng - bfr;
-        const ratioDette = caf > 0 ? (dette / caf).toFixed(1) : (dette > 0 ? "Critique (>15)" : "0,0");
-        const montantGarantie = (dette * (garantiePct / 100)).toFixed(0);
-
-        calculatedFinances = { ca, caf, frng, bfr, treso, dette, ratioDette, montantGarantie, garantiePct };
-
-        const elFrng = document.getElementById('calc-frng');
-        elFrng.innerText = frng + " k€";
-        elFrng.className = frng >= 0 ? "text-sm font-black text-green-700" : "text-sm font-black text-red-600";
-
-        const elBfr = document.getElementById('calc-bfr');
-        elBfr.innerText = bfr + " k€";
-
-        const elTreso = document.getElementById('calc-treso');
-        elTreso.innerText = treso + " k€";
-        elTreso.className = treso >= 0 ? "text-sm font-black text-green-700" : "text-sm font-black text-red-600";
-
-        const elRatio = document.getElementById('calc-ratio-dette');
-        elRatio.innerText = ratioDette + " ans";
-        if (parseFloat(ratioDette) > 8 || caf <= 0) {
-            elRatio.className = "text-sm font-black text-red-600";
-        } else if (parseFloat(ratioDette) > 5) {
-            elRatio.className = "text-sm font-black text-amber-600";
-        } else {
-            elRatio.className = "text-sm font-black text-green-700";
-        }
-
-        const sKey = document.getElementById('cfg-sector').value;
-        const bm = sectorBenchmarks[sKey] || sectorBenchmarks.transport;
-        document.getElementById('label-sector-norm').innerText = bm.label;
-
-        const bulletContainer = document.getElementById('diagnostic-bullet-points');
-        bulletContainer.innerHTML = '';
-
-        if (frng < 0) {
-            bulletContainer.innerHTML += `<li class="text-red-700 flex items-start gap-1.5"><span>🔴</span> <b>FRNG négatif (${frng} k€) :</b> Anomalie critique. Les immobilisations sont financées par des dettes court terme.</li>`;
-        } else {
-            bulletContainer.innerHTML += `<li class="text-green-800 flex items-start gap-1.5"><span>🟢</span> <b>FRNG positif (${frng} k€) :</b> Situation saine. Matelas de sécurité stable.</li>`;
-        }
-
-        const bfrNormEstimate = ca > 0 ? Math.round((ca / 365) * bm.bfrDays) : 180;
-        if (bfr > bfrNormEstimate * 1.4) {
-            bulletContainer.innerHTML += `<li class="text-amber-800 flex items-start gap-1.5"><span>🟡</span> <b>BFR anormal (${bfr} k€ vs moyenne sectorielle ~${bfrNormEstimate} k€) :</b> Écart de +${bfr - bfrNormEstimate} k€. Allongement des impayés ou délais d'encaissement.</li>`;
-        } else {
-            bulletContainer.innerHTML += `<li class="text-green-800 flex items-start gap-1.5"><span>🟢</span> <b>BFR maîtrisé (${bfr} k€ vs moyenne ~${bfrNormEstimate} k€) :</b> Délais de paiement conformes aux standards.</li>`;
-        }
-
-        if (treso < 0) {
-            bulletContainer.innerHTML += `<li class="text-red-700 flex items-start gap-1.5"><span>🔴</span> <b>Trésorerie Nette déficitaire (${treso} k€) :</b> Rupture de liquidité. Le FRNG ne couvre plus le BFR.</li>`;
-        } else {
-            bulletContainer.innerHTML += `<li class="text-green-800 flex items-start gap-1.5"><span>🟢</span> <b>Trésorerie Nette positive (${treso} k€) :</b> Liquidités disponibles.</li>`;
-        }
-
-        const rVal = parseFloat(ratioDette);
-        if (isNaN(rVal) || rVal > bm.ratioMax || caf <= 0) {
-            bulletContainer.innerHTML += `<li class="text-red-700 flex items-start gap-1.5"><span>🚨</span> <b>Désendettement critique (${ratioDette} ans vs seuil limite de ${bm.ratioMax} ans) :</b> Risque majeur d'appel de la garantie publique (${montantGarantie} k€).</li>`;
-        } else {
-            bulletContainer.innerHTML += `<li class="text-green-800 flex items-start gap-1.5"><span>🟢</span> <b>Endettement soutenable (${ratioDette} ans) :</b> Capacité de remboursement alignée.</li>`;
-        }
-    }
-
-    let legalStatus = "Conforme";
-
-    function computeLegal() {
-        if (!document.getElementById('mod-toggle-jur').checked) {
-            legalStatus = "Hors champ";
-            document.getElementById('badge-legal-global').innerText = "Hors champ";
-            document.getElementById('badge-legal-global').className = "text-[11px] font-black px-2 py-0.5 rounded uppercase bg-slate-200 text-slate-700";
-            return;
-        }
-
-        let totalPoints = 0;
-        let activeCount = 0;
-
-        for (let i = 1; i <= 4; i++) {
-            if (document.getElementById('jur-toggle-' + i).checked) {
-                totalPoints += parseFloat(document.getElementById('jur-j' + i).value);
-                activeCount++;
-            }
-        }
-
-        const badge = document.getElementById('badge-legal-global');
-        if (activeCount === 0) {
-            legalStatus = "Non audité";
-            badge.innerText = "Non audité";
-            badge.className = "text-[11px] font-black px-2 py-0.5 rounded uppercase bg-slate-200 text-slate-700";
-            return;
-        }
-
-        const ratio = totalPoints / activeCount;
-        if (ratio >= 0.95) {
-            legalStatus = "Conforme";
-            badge.innerText = "Conforme";
-            badge.className = "text-[11px] font-black px-2 py-0.5 rounded uppercase bg-green-200 text-green-900";
-        } else if (ratio >= 0.5) {
-            legalStatus = "Sous Réserves";
-            badge.innerText = "Sous Réserves";
-            badge.className = "text-[11px] font-black px-2 py-0.5 rounded uppercase bg-amber-200 text-amber-900";
-        } else {
-            legalStatus = "Irrégularité Critique";
-            badge.innerText = "Irrégularité Critique";
-            badge.className = "text-[11px] font-black px-2 py-0.5 rounded uppercase bg-red-200 text-red-900";
-        }
-    }
-
-    let calculatedHS = 40;
-    let scoresAxes = [0, 0, 0, 0, 0];
-    let axesActifs = [true, true, true, true, true];
-
-    function computeHealthScore() {
-        const isQuinzeActive = document.getElementById('mod-toggle-quinze').checked;
-        if (!isQuinzeActive) {
-            calculatedHS = 0;
-            document.getElementById('hs-display').innerText = "N/A";
-            document.getElementById('hs-diag-label').innerText = "Hors mandat";
-            document.getElementById('hs-diag-label').className = "ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-500 text-white";
-            return;
-        }
-
-        let totalPtsGagnes = 0;
-        let totalPtsPossibles = 0;
-
-        for (let axe = 1; axe <= 5; axe++) {
-            const isAxeActive = document.getElementById('axe-toggle-' + axe).checked;
-            axesActifs[axe - 1] = isAxeActive;
-            const card = document.getElementById('card-axe-' + axe);
-
-            if (!isAxeActive) {
-                card.classList.add('opacity-40');
-                scoresAxes[axe - 1] = "Hors champ";
-                document.getElementById('score-axe-' + axe).innerText = "Exclu";
-                continue;
-            } else {
-                card.classList.remove('opacity-40');
-            }
-
-            let ptsAxe = 0;
-            for (let c = 1; c <= 4; c++) {
-                if (document.getElementById(`c-${axe}-${c}`).checked) {
-                    ptsAxe++;
-                }
-            }
-
-            totalPtsGagnes += ptsAxe;
-            totalPtsPossibles += 4;
-
-            scoresAxes[axe - 1] = (ptsAxe * 1.25).toFixed(2).replace('.', ',') + "/5";
-            document.getElementById('score-axe-' + axe).innerText = scoresAxes[axe - 1];
-        }
-
-        if (totalPtsPossibles === 0) {
-            calculatedHS = 100;
-        } else {
-            calculatedHS = Math.round((totalPtsGagnes / totalPtsPossibles) * 100);
-        }
-
-        document.getElementById('hs-display').innerText = calculatedHS;
-
-        const lbl = document.getElementById('hs-diag-label');
-        if (calculatedHS >= 75) {
-            lbl.innerText = "Situation Saine";
-            lbl.className = "ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-600 text-white";
-        } else if (calculatedHS >= 50) {
-            lbl.innerText = "Vigilance Requise";
-            lbl.className = "ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-600 text-white";
-        } else {
-            lbl.innerText = "Vulnérabilité Forte";
-            lbl.className = "ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-600 text-white";
-        }
-    }
-
-    function renderTBI() {
-        document.getElementById('input-section').classList.add('hidden');
-        document.getElementById('workspace-section').classList.add('hidden');
-        document.getElementById('output-section').classList.remove('hidden');
-
-        document.getElementById('tbi-out-entity').innerText = document.getElementById('cfg-entity').value;
-        document.getElementById('tbi-out-authority').innerText = document.getElementById('cfg-authority').value;
-        document.getElementById('tbi-out-instance').innerText = document.getElementById('cfg-instance').value;
-        document.getElementById('tbi-out-date').innerText = "Simulation du " + new Date().toLocaleDateString('fr-FR');
-
-        const finActive = document.getElementById('mod-toggle-fin').checked;
-        const jurActive = document.getElementById('mod-toggle-jur').checked;
-        const qzActive = document.getElementById('mod-toggle-quinze').checked;
-        const othActive = document.getElementById('mod-toggle-other').checked;
-
-        let scopes = [];
-        if (finActive) scopes.push("Finances & Bilan");
-        if (jurActive) scopes.push("Légalité & Risques");
-        if (qzActive) scopes.push("Matrice de Gouvernance");
-        if (othActive) scopes.push("Fait Majeur");
-        document.getElementById('tbi-out-scope-desc').innerText = "Mandat : " + (scopes.length ? scopes.join(" + ") : "Synthèse libre");
-
-        const isRedFlag = document.getElementById('red-flag-toggle').checked;
-        const redBanner = document.getElementById('tbi-red-banner');
-        const b = document.getElementById('tbi-out-hs-badge');
-
-        if (isRedFlag) {
-            redBanner.classList.remove('hidden');
-            document.getElementById('tbi-red-banner-desc').innerText = document.getElementById('red-flag-reason').value;
-            b.innerText = "ALERTE ROUGE (DÉCISION BLOQUÉE)";
-            b.className = "text-center py-1.5 px-2 rounded text-xs font-black uppercase mb-4 bg-red-600 text-white animate-pulse";
-        } else {
-            redBanner.classList.add('hidden');
-            if (!qzActive) {
-                b.innerText = "Hors Périmètre de Gouvernance";
-                b.className = "text-center py-1.5 px-2 rounded text-xs font-black uppercase mb-4 bg-slate-200 text-slate-700";
-            } else if (calculatedHS >= 75) {
-                b.innerText = "Situation Saine & Maîtrisée";
-                b.className = "text-center py-1.5 px-2 rounded text-xs font-black uppercase mb-4 bg-green-100 text-green-800";
-            } else if (calculatedHS >= 50) {
-                b.innerText = "Vigilance Modérée Requise";
-                b.className = "text-center py-1.5 px-2 rounded text-xs font-black uppercase mb-4 bg-amber-100 text-amber-800";
-            } else {
-                b.innerText = "Vulnérabilité Critique";
-                b.className = "text-center py-1.5 px-2 rounded text-xs font-black uppercase mb-4 bg-red-100 text-red-800";
-            }
-        }
-
-        const boxHs = document.getElementById('tbi-box-hs');
-        const boxHsOff = document.getElementById('tbi-box-hs-off');
-        if (qzActive) {
-            boxHs.classList.remove('hidden');
-            boxHsOff.classList.add('hidden');
-            document.getElementById('tbi-out-hs').innerText = calculatedHS;
-
-            const radarList = document.getElementById('tbi-radar-list');
-            radarList.innerHTML = '';
-            const labels = ["1. Gouvernance", "2. Modèle Économique", "3. Organisation & RH", "4. Activité & Usagers", "5. Exécution"];
-            for (let i = 0; i < 5; i++) {
-                if (axesActifs[i]) {
-                    radarList.innerHTML += `
-                        <div class="flex justify-between items-center">
-                            <span>${labels[i]} :</span>
-                            <span class="font-black px-1.5 py-0.5 rounded text-white bg-slate-800 text-[10px]">${scoresAxes[i]}</span>
-                        </div>
-                    `;
-                }
-            }
-        } else {
-            boxHs.classList.add('hidden');
-            boxHsOff.classList.remove('hidden');
-        }
-
-        const boxLegal = document.getElementById('tbi-box-legal');
-        if (jurActive) {
-            boxLegal.classList.remove('hidden');
-            const outLegalBadge = document.getElementById('tbi-out-legal-badge');
-            outLegalBadge.innerText = legalStatus;
-            if (legalStatus === "Conforme") {
-                outLegalBadge.className = "text-xs font-black uppercase py-1 px-2 rounded text-center bg-green-100 text-green-800";
-            } else if (legalStatus === "Sous Réserves") {
-                outLegalBadge.className = "text-xs font-black uppercase py-1 px-2 rounded text-center bg-amber-100 text-amber-800";
-            } else {
-                outLegalBadge.className = "text-xs font-black uppercase py-1 px-2 rounded text-center bg-red-100 text-red-800";
-            }
-            let notes = [];
-            for (let i = 1; i <= 4; i++) {
-                if (document.getElementById('jur-toggle-' + i).checked) {
-                    const txt = document.getElementById('jur-j' + i + '-note').value.trim();
-                    if (txt) notes.push(txt);
-                }
-            }
-            document.getElementById('tbi-out-legal-summary').innerText = notes.length ? notes.join(" ; ") : "Points d'audit réguliers sans anomalie majeure.";
-        } else {
-            boxLegal.classList.add('hidden');
-        }
-
-        const boxFin = document.getElementById('tbi-box-fin');
-        if (finActive) {
-            boxFin.classList.remove('hidden');
-            const sKey = document.getElementById('cfg-sector').value;
-            const bm = sectorBenchmarks[sKey] || sectorBenchmarks.transport;
-            document.getElementById('tbi-out-sector-tag').innerText = "Référentiel : " + bm.label;
-
-            document.getElementById('tbi-row-ca').innerText = calculatedFinances.ca + " k€";
-            document.getElementById('tbi-row-frng').innerText = calculatedFinances.frng + " k€";
-            document.getElementById('tbi-row-frng-norm').innerText = bm.frngNormTxt;
-            document.getElementById('tbi-row-frng-alert').innerText = calculatedFinances.frng >= 0 ? "🟢" : "🔴";
-
-            const bfrNormEstimate = calculatedFinances.ca > 0 ? Math.round((calculatedFinances.ca / 365) * bm.bfrDays) : 180;
-            document.getElementById('tbi-row-bfr').innerText = calculatedFinances.bfr + " k€";
-            document.getElementById('tbi-row-bfr-norm').innerText = `Moyenne sectorielle : ~${bfrNormEstimate} k€`;
-            document.getElementById('tbi-row-bfr-alert').innerText = calculatedFinances.bfr <= bfrNormEstimate * 1.3 ? "🟢" : "🟡";
-
-            document.getElementById('tbi-row-treso').innerText = calculatedFinances.treso + " k€";
-            document.getElementById('tbi-row-treso-alert').innerText = calculatedFinances.treso >= 0 ? "🟢" : "🔴";
-
-            document.getElementById('tbi-row-ratio').innerText = calculatedFinances.ratioDette + " ans";
-            document.getElementById('tbi-row-ratio-norm').innerText = `Seuil critique : ${bm.ratioMax} années`;
-            const rVal = parseFloat(calculatedFinances.ratioDette);
-            document.getElementById('tbi-row-ratio-alert').innerText = (isNaN(rVal) || rVal > bm.ratioMax || calculatedFinances.caf <= 0) ? "🔴" : "🟢";
-
-            document.getElementById('tbi-out-garantie').innerText = calculatedFinances.montantGarantie + " k€ (" + calculatedFinances.garantiePct + " % du total)";
-        } else {
-            boxFin.classList.add('hidden');
-        }
-
-        const boxOther = document.getElementById('tbi-box-other');
-        const otherImpact = document.getElementById('other-impact').value;
-        if (othActive && otherImpact !== 'none') {
-            boxOther.classList.remove('hidden');
-            document.getElementById('tbi-out-other-title').innerText = document.getElementById('other-title').value;
-            document.getElementById('tbi-out-other-desc').innerText = document.getElementById('other-desc').value;
-            const impBadge = document.getElementById('tbi-out-other-impact');
-            if (otherImpact === 'blocking') {
-                impBadge.innerText = "Bloquant";
-                impBadge.className = "font-bold text-[10px] px-1.5 py-0.5 rounded bg-red-600 text-white";
-            } else if (otherImpact === 'major') {
-                impBadge.innerText = "Majeur";
-                impBadge.className = "font-bold text-[10px] px-1.5 py-0.5 rounded bg-amber-600 text-white";
-            } else {
-                impBadge.innerText = "Mineur";
-                impBadge.className = "font-bold text-[10px] px-1.5 py-0.5 rounded bg-slate-300 text-slate-800";
-            }
-        } else {
-            boxOther.classList.add('hidden');
-        }
-
-        document.getElementById('tbi-out-arb-choice').innerText = document.getElementById('arb-choice').value;
-        document.getElementById('tbi-out-arb-text').innerText = document.getElementById('arb-text').value || "Aucun motif consigné.";
-        document.getElementById('tbi-out-imp-fin').innerText = document.getElementById('arb-impact-fin').value;
-        document.getElementById('tbi-out-imp-rh').innerText = document.getElementById('arb-impact-rh').value;
-        document.getElementById('tbi-out-risk-pol').innerText = document.getElementById('arb-risk-pol').value;
-    }
-
-    function backToEdit() {
-        document.getElementById('output-section').classList.add('hidden');
-        document.getElementById('input-section').classList.remove('hidden');
-        document.getElementById('workspace-section').classList.remove('hidden');
-    }
-
-    // Initialisation directe sur le cas de démonstration 1
-    loadCaseTemplate();
-</script>
-</body>
-</html>
+# ==========================================
+# 3. GÉNÉRATEURS DE RAPPORTS PDF EXÉCUTIFS
+# ==========================================
+def _box(ax, x, y, w, h, fc="#ffffff", ec="#cbd5e1", lw=1.0, r=0.012):
+    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle=f"round,pad=0,rounding_size={r}", facecolor=fc, edgecolor=ec, linewidth=lw, transform=ax.transAxes))
+
+def _draw_lines(ax, x, y_start, items, wrap_w=115, step_y=0.016, gap_item=0.005, fontsize=7.0, color="#1e293b", bold_prefix=False):
+    y = y_start
+    for it in items:
+        wrapped = textwrap.wrap(it, width=wrap_w)
+        for idx, wl in enumerate(wrapped):
+            ax.text(x, y, wl, fontsize=fontsize, color=color, fontweight=("bold" if (bold_prefix and idx == 0) else "normal"), transform=ax.transAxes)
+            y -= step_y
+        y -= gap_item
+    return y
+
+def _header_pdf(ax, titre_doc, sous_titre):
+    ax.add_patch(Rectangle((0, 0.915), 1, 0.085, facecolor="#0f172a", transform=ax.transAxes))
+    ax.add_patch(Rectangle((0, 0.911), 1, 0.004, facecolor="#d97706", transform=ax.transAxes))
+    ax.text(0.04, 0.962, titre_doc, color="white", fontsize=10.2, fontweight="bold", transform=ax.transAxes)
+    ax.text(0.04, 0.930, sous_titre, color="#cbd5e1", fontsize=7.6, transform=ax.transAxes)
+
+def _footer_pdf(ax, gauche, page_txt):
+    ax.plot([0.04, 0.96], [0.038, 0.038], color="#cbd5e1", lw=0.8, transform=ax.transAxes)
+    ax.text(0.04, 0.020, gauche, fontsize=7.0, color="#64748b", transform=ax.transAxes)
+    ax.text(0.96, 0.020, page_txt, ha="right", fontsize=7.0, fontweight="bold", color="#475569", transform=ax.transAxes)
+
+def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, tcma_p, tcma_c, tcma_ms, gvt_pt, conv_pt, vol_pt, atouts_txt, vig_txt):
+    buf = io.BytesIO()
+    with PdfPages(buf) as pdf:
+        fig = plt.figure(figsize=(8.27, 11.69), dpi=150)
+        ax = fig.add_axes([0, 0, 1, 1])
+        ax.axis("off")
+        _header_pdf(ax, "ARCHÉTYPE ÉDUCATION  |  DOSSIER D'AUDIT RÉTROSPECTIF ANC 2018-06 (2021-2025)", f"ÉTABLISSEMENT : {etab.upper()}  •  {normes['type_court'].upper()}  •  RÉFÉRENTIEL STRATE")
+
+        ciseau = tcma_c - tcma_p
+        var_caf = caf_r[-1] - caf_r[0]
+        kpis = [
+            ("TCMA PRODUITS", f"+{tcma_p:.2f} % / an", "Dynamique des ressources", "#059669"),
+            ("TCMA CHARGES", f"+{tcma_c:.2f} % / an", f"Écart : {ciseau:+.2f} pts vs Prod.", "#dc2626" if ciseau > 0.3 else "#d97706"),
+            ("TCMA MASSE SALARIALE", f"+{tcma_ms:.2f} % / an", f"Poids : {(ms_r[-1]/p_r[-1]*100):.1f} % (Norme {normes['poids_ms']}%)", "#1d4ed8"),
+            ("ÉVOLUTION CAF", f"{caf_r[-1]:.2f} M€", f"Variation : {var_caf:+.2f} M€ (Cible {normes['taux_caf']}%)", "#059669" if var_caf >= 0 else "#dc2626"),
+        ]
+        for i, (kt, kv, ks, kc) in enumerate(kpis):
+            kx = 0.04 + i * 0.233
+            _box(ax, kx, 0.815, 0.218, 0.084, fc="#f8fafc")
+            ax.text(kx + 0.012, 0.880, kt, fontsize=6.9, fontweight="bold", color="#475569", transform=ax.transAxes)
+            ax.text(kx + 0.012, 0.845, kv, fontsize=11.8, fontweight="bold", color=kc, transform=ax.transAxes)
+            ax.text(kx + 0.012, 0.823, ks, fontsize=6.5, color="#64748b", transform=ax.transAxes)
+
+        ax.text(0.04, 0.785, "1. EFFET DE CISEAU HISTORIQUE (PRODUITS VS CHARGES)", fontsize=8.1, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+        g1 = fig.add_axes([0.06, 0.595, 0.41, 0.175])
+        g1.plot(ans_r, p_r, marker="o", color="#2563eb", lw=2, label="Produits")
+        g1.plot(ans_r, c_r, marker="s", color="#dc2626", lw=2, label="Charges")
+        g1.grid(True, linestyle="--", alpha=0.5)
+        g1.tick_params(labelsize=7)
+        g1.legend(fontsize=6.8, loc="upper left")
+
+        ax.text(0.52, 0.785, "2. TRAJECTOIRE DE LA CAF & AUTOFINANCEMENT NET", fontsize=8.1, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+        g2 = fig.add_axes([0.54, 0.595, 0.41, 0.175])
+        g2.plot(ans_r, caf_r, marker="^", color="#059669", lw=2, label="CAF")
+        g2.plot(ans_r, aut_r, marker="s", color="#d97706", lw=2, label="Autofin. Net")
+        g2.grid(True, linestyle="--", alpha=0.5)
+        g2.tick_params(labelsize=7)
+        g2.legend(fontsize=6.8, loc="upper left")
+
+        ax.text(0.04, 0.545, "3. EFFORT D'INVESTISSEMENT & RENOUVELLEMENT PATRIMONIAL (M€)", fontsize=8.1, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+        g3 = fig.add_axes([0.06, 0.375, 0.41, 0.155])
+        g3.bar(ans_r, inv_r, color="#1e40af", width=0.5)
+        g3.grid(True, axis="y", linestyle="--", alpha=0.5)
+        g3.tick_params(labelsize=7)
+
+        _box(ax, 0.51, 0.375, 0.45, 0.155, fc="#f8fafc")
+        ax.text(0.525, 0.508, "DIAGNOSTIC DE L'EFFORT D'ÉQUIPEMENT", fontsize=7.8, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+        moy_inv = np.mean(inv_r)
+        diag_eq = [
+            f"• Enveloppe moyenne exécutée : {moy_inv:.2f} M€ / an.",
+            f"• Taux de renouvellement vs amortissements : {(moy_inv / max(0.01, (caf_r[-1] - (p_r[-1]-c_r[-1]))) * 100):.0f} % (Norme >= 100 %).",
+            "• Enjeu : Préserver la valeur nette comptable du bâti sans dégrader la Règle d'Or ni la trésorerie."
+        ]
+        _draw_lines(ax, 0.525, 0.480, diag_eq, wrap_w=56, step_y=0.018, gap_item=0.006, fontsize=7.0)
+
+        ax.text(0.04, 0.335, "TABLEAU RÉTROSPECTIF DES SOLDES ANC 2018-06 (2021-2025)", fontsize=8.1, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+        tax = fig.add_axes([0.04, 0.150, 0.92, 0.170])
+        tax.axis("off")
+        t_rows = [
+            ["Produits d'exploitation (M€)"] + [f"{v:.2f}" for v in p_r],
+            ["Charges d'exploitation (M€)"] + [f"{v:.2f}" for v in c_r],
+            ["Masse salariale interne Cpte 64 (M€)"] + [f"{v:.2f}" for v in ms_r],
+            ["Capacité d'Autofinancement — CAF (M€)"] + [f"{v:.2f}" for v in caf_r],
+            ["Autofinancement net après dette (M€)"] + [f"{v:.2f}" for v in aut_r],
+            [f"Taux de CAF (Norme strate : {normes['taux_caf']} %)"] + [f"{(c/p*100):.1f} %" for c, p in zip(caf_r, p_r)],
+        ]
+        tbl = tax.table(cellText=t_rows, colLabels=["Soldes ANC 2018-06"] + ans_r, loc="center", cellLoc="center", colWidths=[0.44] + [0.112]*len(ans_r))
+        tbl.set_fontsize(7.1)
+        tbl.scale(1, 1.22)
+        for (r, c), cell in tbl.get_celld().items():
+            cell.set_edgecolor("#cbd5e1")
+            if r == 0:
+                cell.set_facecolor("#1e293b")
+                cell.get_text().set_color("white")
+                cell.get_text().set_weight("bold")
+            elif c == 0:
+                cell.get_text().set_ha("left")
+
+        _box(ax, 0.04, 0.052, 0.92, 0.082, fc="#fffbeb", ec="#fcd34d")
+        ax.text(0.055, 0.114, "SYNTHÈSE DE L'EFFET DE CISEAU & POSITIONNEMENT NORMATIF", fontsize=7.6, fontweight="bold", color="#92400e", transform=ax.transAxes)
+        cis_lines = [
+            f"• Les charges (+{tcma_c:.2f} %/an) progressent {'plus vite' if ciseau > 0 else 'moins vite'} que les produits (+{tcma_p:.2f} %/an), créant un effet ciseau de {ciseau:+.2f} pts/an.",
+            f"• Le taux de CAF s'établit à {(caf_r[-1]/p_r[-1]*100):.1f} % en {ans_r[-1]} contre une moyenne observatoire de {normes['taux_caf']} % pour ce profil d'établissement."
+        ]
+        _draw_lines(ax, 0.055, 0.092, cis_lines, wrap_w=124, step_y=0.017, gap_item=0.004, fontsize=7.0)
+        _footer_pdf(ax, "Dossier Rétrospectif ANC 2018-06  •  Cabinet QUINZE", "Page 1/2")
+        pdf.savefig(fig)
+        plt.close(fig)
+
+        # PAGE 2 : DÉRIVE RH & BILAN STRATÉGIQUE
+        fig2 = plt.figure(figsize=(8.27, 11.69), dpi=150)
+        ax2 = fig2.add_axes([0, 0, 1, 1])
+        ax2.axis("off")
+        _header_pdf(ax2, "ARCHÉTYPE ÉDUCATION  |  DÉCOMPOSITION DE LA DÉRIVE RH & SYNTHÈSE", f"ÉTABLISSEMENT : {etab.upper()}  •  LEVIERS MANAGÉRIAUX & PISTES D'AUDIT")
+
+        ax2.text(0.04, 0.875, "1. DÉCOMPOSITION DE LA PROGRESSION DE LA MASSE SALARIALE INTERNE (COMPTE 64)", fontsize=8.2, fontweight="bold", color="#0f172a", transform=ax2.transAxes)
+        grh = fig2.add_axes([0.24, 0.675, 0.70, 0.180])
+        cats = ["Effet Volume\n(Postes / Rempl.)", "Mesures Convent.\n(EEPNL / SMIC)", "GVT Mécanique\n(Ancienneté)"]
+        vals = [vol_pt, conv_pt, gvt_pt]
+        cols_rh = ["#059669" if vol_pt <= 0.3 else "#dc2626", "#d97706", "#64748b"]
+        grh.barh(cats, vals, color=cols_rh, height=0.52)
+        grh.set_xlabel("Contribution annuelle (% / an)", fontsize=7.5)
+        grh.grid(True, axis="x", linestyle="--", alpha=0.5)
+        grh.tick_params(labelsize=7.5)
+
+        _box(ax2, 0.04, 0.515, 0.92, 0.125, fc="#f8fafc", ec="#cbd5e1")
+        ax2.text(0.055, 0.618, "LECTURE MANAGÉRIALE : FACTEURS SUBIS VS LEVIER INTERNE (NORME VOLUME <= 0,3 PT/AN)", fontsize=7.7, fontweight="bold", color="#0f172a", transform=ax2.transAxes)
+        rh_lines = [
+            f"• Sur +{tcma_ms:.2f} %/an d'évolution salariale, {(gvt_pt+conv_pt):.2f} points sont structurels (GVT ancienneté + revalorisations conventionnelles EEPNL/SMIC).",
+            f"• {vol_pt:+.2f} points relèvent directement de l'organisation interne (créations de postes, remplacements non compensés, heures supplémentaires).",
+            f"• Le poids global de la MS interne atteint {(ms_r[-1]/p_r[-1]*100):.1f} % des produits (Moyenne observatoire du profil : {normes['poids_ms']} %)."
+        ]
+        _draw_lines(ax2, 0.055, 0.592, rh_lines, wrap_w=122, step_y=0.017, gap_item=0.005, fontsize=7.1)
+
+        ax2.text(0.04, 0.480, "2. BILAN STRATÉGIQUE : ATOUTS & LEVIERS D'AJUSTEMENT BUDGÉTAIRE", fontsize=8.2, fontweight="bold", color="#0f172a", transform=ax2.transAxes)
+        _box(ax2, 0.04, 0.115, 0.445, 0.350, fc="#ecfdf5", ec="#6ee7b7")
+        ax2.text(0.055, 0.442, "ATOUTS & MARGES DE MANŒUVRE", fontsize=7.8, fontweight="bold", color="#065f46", transform=ax2.transAxes)
+        _draw_lines(ax2, 0.055, 0.412, [f"• {x}" for x in atouts_txt], wrap_w=54, step_y=0.019, gap_item=0.010, fontsize=7.1)
+
+        _box(ax2, 0.515, 0.115, 0.445, 0.350, fc="#fffbeb", ec="#fcd34d")
+        ax2.text(0.530, 0.442, "LEVIERS BUDGÉTAIRES & POINTS DE VIGILANCE", fontsize=7.8, fontweight="bold", color="#92400e", transform=ax2.transAxes)
+        _draw_lines(ax2, 0.530, 0.412, [f"• {x}" for x in vig_txt], wrap_w=54, step_y=0.019, gap_item=0.010, fontsize=7.1)
+
+        _footer_pdf(ax2, "Dossier Rétrospectif ANC 2018-06  •  Cabinet QUINZE", "Page 2/2")
+        pdf.savefig(fig2)
+        plt.close(fig2)
+    return buf.getvalue()
+
+def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ebe, amo_fin, rn, caf, remb, aut, dette, cap_d, treso, j_treso, ro_solde, maint_m2, b_peda, m_ufa, m_cfc, synthese_tbi):
+    buf = io.BytesIO()
+    fig = plt.figure(figsize=(8.27, 11.69), dpi=150)
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.axis("off")
+    _header_pdf(ax, "ARCHÉTYPE ÉDUCATION  |  PLATEFORME D'ARBITRAGE ANC 2018-06 & NORMES", f"ÉTABLISSEMENT : {etab.upper()} ({eleves} ÉLÈVES  •  {surf} M²  •  {normes['strate'].upper()})")
+
+    sc_col = "#059669" if score >= 70 else ("#d97706" if score >= 45 else "#dc2626")
+    sc_bg = "#ecfdf5" if score >= 70 else ("#fffbeb" if score >= 45 else "#fef2f2")
+    _box(ax, 0.04, 0.815, 0.92, 0.084, fc=sc_bg, ec=sc_col, lw=1.4)
+    ax.text(0.06, 0.875, "HEALTH SCORE ANC 2018-06", fontsize=7.5, fontweight="bold", color="#475569", transform=ax.transAxes)
+    ax.text(0.06, 0.832, f"{score}/100", fontsize=19.0, fontweight="bold", color=sc_col, transform=ax.transAxes)
+    statut_msg = "STRUCTURE FINANCIÈRE SAINE ET CONFORME AUX NORMES" if score >= 70 else ("TENSION D'ÉPARGNE OU D'ÉQUILIBRE PAR RAPPORT AUX MOYENNES" if score >= 45 else "ALERTE STRUCTURELLE : ÉCART CRITIQUE AUX NORMES")
+    ax.text(0.24, 0.872, statut_msg, fontsize=8.3, fontweight="bold", color=sc_col, transform=ax.transAxes)
+    tcaf = (caf / tp * 100) if tp > 0 else 0
+    tebe = (ebe / tp * 100) if tp > 0 else 0
+    ax.text(0.24, 0.848, f"EBE : {tebe:.1f}% (Moy. {normes['taux_ebe']}%) | CAF : {tcaf:.1f}% (Cible {normes['taux_caf']}%) | Désend. : {cap_d:.1f} ans (Moy. {normes['desend_moy']} a.)", fontsize=7.2, color="#1e293b", transform=ax.transAxes)
+    ax.text(0.24, 0.826, f"Règle d'Or : {ro_solde:+.2f} M€ (Norme >= 0) | Tréso : {j_treso} j (Cible {normes['jours_treso']} j) | Pédago : {b_peda:.0f} €/él. (Norme {normes['b_peda']} €)", fontsize=7.2, color="#1e293b", transform=ax.transAxes)
+
+    # Bloc 1 : Cascade SIG avec Normes
+    _box(ax, 0.04, 0.450, 0.50, 0.350, fc="#ffffff")
+    ax.add_patch(Rectangle((0.04, 0.762), 0.50, 0.038, facecolor="#1e293b", transform=ax.transAxes))
+    ax.text(0.055, 0.775, "1. CASCADE DES SIG VS MOYENNE STRATE", color="white", fontsize=8.0, fontweight="bold", transform=ax.transAxes)
+    sig_rows = [
+        ("Produits d'Exploitation", f"{tp:.2f} M€", "100%", True, "#1d4ed8"),
+        ("- Achats consommés (60)", f"-{ach:.2f} M€", "-", False, "#475569"),
+        ("- Services ext., Maint., Fluides", f"-{ext_f:.2f} M€", "-", False, "#475569"),
+        ("= Valeur Ajoutée (VA)", f"{va:.2f} M€", "-", True, "#0f172a"),
+        ("- Masse Salariale (64)", f"-{ms:.2f} M€", f"Norme {normes['poids_ms']}%", False, "#475569"),
+        ("= EBE (Excédent Brut)", f"{ebe:.2f} M€ ({tebe:.1f}%)", f"Moy. {normes['taux_ebe']}%", True, "#059669" if tebe >= normes['taux_ebe'] else "#dc2626"),
+        ("- Amortissements & Intérêts", f"-{amo_fin:.2f} M€", "-", False, "#475569"),
+        ("= Résultat Net (RCAI)", f"{rn:+.2f} M€", "Norme >= 0", True, "#059669" if rn >= 0 else "#dc2626"),
+        ("= CAF", f"{caf:.2f} M€ ({tcaf:.1f}%)", f"Cible {normes['taux_caf']}%", True, "#b45309"),
+        ("- Remb. Capital Dette", f"-{remb:.2f} M€", "-", False, "#475569"),
+        ("= Autofinancement Net", f"{aut:+.2f} M€", "Norme >= 0", True, "#059669" if aut >= 0 else "#dc2626"),
+    ]
+    ys = 0.735
+    for lbl, val, nrm, bld, col in sig_rows:
+        if bld:
+            ax.add_patch(Rectangle((0.046, ys - 0.007), 0.488, 0.024, facecolor="#f1f5f9", transform=ax.transAxes))
+        ax.text(0.052, ys, lbl, fontsize=6.9, fontweight="bold" if bld else "normal", color="#1e293b", transform=ax.transAxes)
+        ax.text(0.415, ys, val, ha="right", fontsize=7.0, fontweight="bold" if bld else "normal", color=col, transform=ax.transAxes)
+        ax.text(0.532, ys, nrm, ha="right", fontsize=6.5, color="#64748b", transform=ax.transAxes)
+        ys -= 0.027
+
+    # Bloc 2 : Scalpel vs Normes
+    _box(ax, 0.56, 0.635, 0.40, 0.165, fc="#ffffff")
+    ax.add_patch(Rectangle((0.56, 0.762), 0.40, 0.038, facecolor="#1e293b", transform=ax.transAxes))
+    ax.text(0.575, 0.775, "2. RATIOS MÉTIERS VS NORMES", color="white", fontsize=8.0, fontweight="bold", transform=ax.transAxes)
+    sc_items = [
+        ("Maintenance (615) :", f"{maint_m2:.1f} €/m² (Moy. {normes['maint_m2']} €)"),
+        ("Budget Pédago. :", f"{b_peda:.0f} €/él. (Moy. {normes['b_peda']} €)"),
+        ("Marge UFA :", f"{m_ufa:+.2f} M€ (Cible >= 0)"),
+        ("Marge CFC :", f"{m_cfc:+.2f} M€ (Cible >= 0)"),
+    ]
+    ysc = 0.732
+    for k, v in sc_items:
+        ax.text(0.572, ysc, k, fontsize=6.9, color="#475569", transform=ax.transAxes)
+        ax.text(0.948, ysc, v, ha="right", fontsize=7.0, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+        ysc -= 0.028
+
+    # Bloc 3 : Patrimoine & Dette vs Normes
+    _box(ax, 0.56, 0.450, 0.40, 0.170, fc="#ffffff")
+    ax.add_patch(Rectangle((0.56, 0.582), 0.40, 0.038, facecolor="#1e293b", transform=ax.transAxes))
+    ax.text(0.575, 0.595, "3. DETTE & TRÉSORERIE VS NORMES", color="white", fontsize=8.0, fontweight="bold", transform=ax.transAxes)
+    det_items = [
+        ("Encours Dette :", f"{dette:.2f} M€"),
+        ("Désendettement :", f"{cap_d:.1f} a. (Moy. {normes['desend_moy']} a.)"),
+        ("Règle d'Or Immo :", f"{ro_solde:+.2f} M€ (Norme >= 0)"),
+        ("Trésorerie :", f"{j_treso} j (Cible {normes['jours_treso']} j)"),
+    ]
+    yd = 0.552
+    for k, v in det_items:
+        ax.text(0.572, yd, k, fontsize=6.9, color="#475569", transform=ax.transAxes)
+        ax.text(0.948, yd, v, ha="right", fontsize=7.0, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+        yd -= 0.028
+
+    # Bloc 4 : Synthèse Unifiée
+    _box(ax, 0.04, 0.275, 0.92, 0.160, fc="#f8fafc", ec="#94a3b8")
+    ax.text(0.055, 0.415, "4. SYNTHÈSE EXÉCUTIVE & CLÉS D'AJUSTEMENT BUDGÉTAIRE", fontsize=8.0, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+    _draw_lines(ax, 0.055, 0.390, synthese_tbi, wrap_w=124, step_y=0.017, gap_item=0.005, fontsize=7.0)
+
+    # Référentiel bas de page
+    ax.text(0.04, 0.248, f"GRILLE DES MOYENNES & SEUILS DE VIGILANCE ({normes['strate'].upper()})", fontsize=7.6, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+    refs = [
+        ("EBE & TAUX DE CAF", "Performance & Épargne", [f"EBE moy. : {normes['taux_ebe']} %", f"CAF cible : >= {normes['taux_caf']} %", "Alerte CAF : < 4,0 %"]),
+        ("RÈGLE D'OR IMMO", "Contrib. 756 - Immo", ["Norme : >= 0 €", "Étanchéité scolaire", "Alerte si déficit"]),
+        ("DÉSENDETTEMENT", "Encours Dette / CAF", [f"Moy. strate : {normes['desend_moy']} ans", f"Seuil max : {normes['desend_max']} ans", "Refus prêt : > 10 ans"]),
+        ("TRÉSORERIE & RH", "Liquidité & Rigidité", [f"Tréso cible : {normes['jours_treso']} j", f"MS moy. : {normes['poids_ms']} % prod.", f"Maint. moy. : {normes['maint_m2']} €/m²"]),
+    ]
+    for i, (rt, rf, rbullets) in enumerate(refs):
+        rx = 0.04 + i * 0.233
+        _box(ax, rx, 0.055, 0.218, 0.180, fc="#ffffff")
+        ax.text(rx + 0.012, 0.215, rt, fontsize=7.2, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+        ax.text(rx + 0.012, 0.193, rf, fontsize=6.5, color="#64748b", transform=ax.transAxes)
+        _draw_lines(ax, rx + 0.012, 0.160, [f"• {b}" for b in rbullets], wrap_w=32, step_y=0.024, gap_item=0.004, fontsize=6.9)
+
+    _footer_pdf(ax, "Rapport certifié conforme aux règles ANC 2018-06  •  Cabinet QUINZE", "Page 1/1")
+    fig.savefig(buf, format="pdf")
+    plt.close(fig)
+    return buf.getvalue()
+
+def build_pdf_prospective(etab, normes, ppi_annuel, exec_pct, df_proj, feuille_route):
+    buf = io.BytesIO()
+    fig = plt.figure(figsize=(8.27, 11.69), dpi=150)
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.axis("off")
+    _header_pdf(ax, "ARCHÉTYPE ÉDUCATION  |  TRAJECTOIRE PROSPECTIVE & ARBITRAGE BUDGET (2026-2030)", f"ÉTABLISSEMENT : {etab.upper()}  •  SCÉNARIO : CIBLE OPTIMISÉE  •  PPI : {ppi_annuel:.2f} M€/AN (EXÉC. {exec_pct:.0f}%)")
+
+    caf_30 = df_proj["CAF (M€)"].iloc[-1]
+    tcaf_30 = (caf_30 / df_proj["Produits (M€)"].iloc[-1] * 100)
+    des_30 = df_proj["Désendettement (ans)"].iloc[-1]
+    det_30 = df_proj["Dette 31/12 (M€)"].iloc[-1]
+    var_det = det_30 - df_proj["Dette 31/12 (M€)"].iloc[0]
+    j_30 = df_proj["Trésorerie (jours)"].iloc[-1]
+    tr_30 = df_proj["Trésorerie (M€)"].iloc[-1]
+
+    kpis = [
+        ("CAF 2030", f"+{caf_30:.2f} M€", f"Taux : {tcaf_30:.1f}% (Cible {normes['taux_caf']}%)", "#059669" if tcaf_30 >= normes["taux_caf"] else "#d97706"),
+        ("DÉSENDETTEMENT 2030", f"{des_30:.1f} ans", f"Moy. {normes['desend_moy']} a. | Max {normes['desend_max']} a.", "#059669" if des_30 <= normes["desend_max"] else "#dc2626"),
+        ("ENCOURS DETTE 2030", f"{det_30:.2f} M€", f"Variation période : {var_det:+.2f} M€", "#0f172a"),
+        ("TRÉSORERIE 2030", f"{j_30:.0f} jours", f"{tr_30:.2f} M€ (Cible {normes['jours_treso']} j)", "#1d4ed8" if j_30 >= 60 else "#dc2626"),
+    ]
+    for i, (kt, kv, ks, kc) in enumerate(kpis):
+        kx = 0.04 + i * 0.233
+        _box(ax, kx, 0.815, 0.218, 0.084, fc="#f8fafc")
+        ax.text(kx + 0.012, 0.880, kt, fontsize=6.9, fontweight="bold", color="#475569", transform=ax.transAxes)
+        ax.text(kx + 0.012, 0.845, kv, fontsize=11.8, fontweight="bold", color=kc, transform=ax.transAxes)
+        ax.text(kx + 0.012, 0.823, ks, fontsize=6.5, color="#64748b", transform=ax.transAxes)
+
+    ax.text(0.04, 0.785, "1. PROJECTION PRODUITS VS CHARGES (INCLUANT OPEX INDUITS PPI)", fontsize=8.0, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+    gp1 = fig.add_axes([0.06, 0.595, 0.41, 0.175])
+    gp1.plot(df_proj["Année"], df_proj["Produits (M€)"], marker="o", color="#2563eb", lw=2, label="Produits")
+    gp1.plot(df_proj["Année"], df_proj["Charges + OPEX (M€)"], marker="s", color="#dc2626", lw=2, label="Charges+OPEX")
+    gp1.grid(True, linestyle="--", alpha=0.5)
+    gp1.tick_params(labelsize=7)
+    gp1.legend(fontsize=6.8, loc="upper left")
+
+    ax.text(0.52, 0.785, "2. SOLDE DE CAF & TRÉSORERIE DISPONIBLE (M€)", fontsize=8.0, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+    gp2 = fig.add_axes([0.54, 0.595, 0.41, 0.175])
+    gp2.plot(df_proj["Année"], df_proj["CAF (M€)"], marker="^", color="#059669", lw=2, label="CAF")
+    gp2.plot(df_proj["Année"], df_proj["Trésorerie (M€)"], marker="s", linestyle=":", color="#2563eb", lw=2, label="Trésorerie")
+    gp2.grid(True, linestyle="--", alpha=0.5)
+    gp2.tick_params(labelsize=7)
+    gp2.legend(fontsize=6.8, loc="upper left")
+
+    ax.text(0.04, 0.548, "TABLEAU PLURIANNUEL DES TRAJECTOIRES BUDGÉTAIRES ANC 2018-06 (2026-2030)", fontsize=8.1, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+    tp_ax = fig.add_axes([0.04, 0.340, 0.92, 0.195])
+    tp_ax.axis("off")
+    t_data = [
+        ["Produits d'exploitation (M€)"] + [f"{v:.2f}" for v in df_proj["Produits (M€)"]],
+        ["Charges d'exploitation + OPEX induits (M€)"] + [f"{v:.2f}" for v in df_proj["Charges + OPEX (M€)"]],
+        [f"CAF (Norme cible : >= {normes['taux_caf']} %)"] + [f"{v:.2f}" for v in df_proj["CAF (M€)"]],
+        ["Subventions d'équipement / AEP encaissées (M€)"] + [f"{v:.2f}" for v in df_proj["Subv. PPI (M€)"]],
+        ["Encours de la dette au 31/12 (M€)"] + [f"{v:.2f}" for v in df_proj["Dette 31/12 (M€)"]],
+        [f"Désendettement (Moy. strate : {normes['desend_moy']} ans)"] + [f"{v:.1f}" for v in df_proj["Désendettement (ans)"]],
+        [f"Trésorerie nette (Cible : {normes['jours_treso']} jours)"] + [f"{v:.0f} j" for v in df_proj["Trésorerie (jours)"]],
+    ]
+    tbl = tp_ax.table(cellText=t_data, colLabels=["Indicateurs & Normes ANC 2018-06"] + list(df_proj["Année"]), loc="center", cellLoc="center", colWidths=[0.46] + [0.108]*5)
+    tbl.set_fontsize(7.0)
+    tbl.scale(1, 1.24)
+    for (r, c), cell in tbl.get_celld().items():
+        cell.set_edgecolor("#cbd5e1")
+        if r == 0:
+            cell.set_facecolor("#1e293b")
+            cell.get_text().set_color("white")
+            cell.get_text().set_weight("bold")
+        elif c == 0:
+            cell.get_text().set_ha("left")
+
+    _box(ax, 0.04, 0.055, 0.92, 0.270, fc="#ecfdf5", ec="#6ee7b7")
+    ax.text(0.055, 0.305, "SYNTHÈSE PROSPECTIVE & FEUILLE DE ROUTE D'AJUSTEMENT BUDGÉTAIRE", fontsize=7.8, fontweight="bold", color="#065f46", transform=ax.transAxes)
+    _draw_lines(ax, 0.055, 0.280, feuille_route, wrap_w=124, step_y=0.016, gap_item=0.005, fontsize=7.0)
+
+    _footer_pdf(ax, "Document de prospective ANC 2018-06  •  Cabinet QUINZE — Ingénierie & Conseil Éducation", "Page 1/1")
+    fig.savefig(buf, format="pdf")
+    plt.close(fig)
+    return buf.getvalue()
+
+# ==========================================
+# 4. BARRE LATÉRALE : INGESTION & PARAMÉTRAGE
+# ==========================================
+st.sidebar.markdown("## 🎓 Archétype Éducation")
+type_etab = st.sidebar.selectbox(
+    "Profil & Tutelle de l'établissement",
+    [
+        "Ensemble scolaire mixte (École + Collège + Lycée)",
+        "2nd degré (Lycée GT / Pro — Loi Debré)",
+        "2nd degré (Collège — Loi Debré)",
+        "1er degré (École maternelle / élémentaire)",
+        "Lycée Agricole Temps Plein (Art. L. 813-8 MASA)",
+        "MFR / Alternance (Art. L. 813-9 MASA)"
+    ]
+)
+is_agricole = ("Agricole" in type_etab) or ("MFR" in type_etab)
+normes = get_normes_etablissement(type_etab)
+etab = st.sidebar.text_input("Nom de l'établissement", "Lycée Polyvalent Saint-Éloi")
+
+c_sb1, c_sb2 = st.sidebar.columns(2)
+eleves_tot = c_sb1.number_input("Élèves (initial)", min_value=1, value=650, step=10)
+surface_m2 = c_sb2.number_input("Surface bâtie (m²)", min_value=100, value=4800, step=100)
+taux_internat = st.sidebar.slider("Taux demi-pensionnaires / internes (%)", 0, 100, int(normes["tx_internat"]), 5)
+internes_tot = int(round(eleves_tot * taux_internat / 100))
+
+st.sidebar.markdown("### 1. Ingestion Balances (2021-2025)")
+fichiers = st.sidebar.file_uploader("Importer balances comptables (.csv, .xlsx)", type=["csv", "xlsx", "xls"], accept_multiple_files=True)
+balances_parsees = []
+if fichiers:
+    for f in fichiers:
+        rb = parse_balance_ogec(f)
+        if rb:
+            balances_parsees.append(rb)
+balances_parsees.sort(key=lambda x: x["annee"] or x["fichier"])
+source_reelle = len(balances_parsees) > 0
+
+if source_reelle:
+    dern = balances_parsees[-1]
+    d_f74, d_c756, d_a70, d_autp = dern["f_74"], (dern["c_756"] if dern["c_756"] > 0 else dern["tp"]*0.22), dern["a_70"], dern["aut_p"]
+    d_ach, d_loy, d_maint, d_ext, d_ms = dern["ach_60"], dern["loy_613"], dern["maint_615"], dern["aut_ext"], dern["ms_64"]
+    d_fin, d_amo = dern["fin_66"], dern["amo_68"]
+    d_det = dern["dette"] if dern["dette"] > 0 else 1550000.0
+    d_remb = dern["remb"] if dern["remb"] > 0 else 145000.0
+    d_tres = dern["tres"] if dern["tres"] > 0 else 440000.0
+else:
+    d_f74 = float(eleves_tot * normes["forfait_eleve"])
+    d_c756 = float(eleves_tot * normes["contrib_eleve"])
+    d_a70 = float(internes_tot * 780 + 45000)
+    d_autp = 45000.0
+    d_ach = float(eleves_tot * normes["b_peda"] + internes_tot * 290)
+    d_loy = 85000.0
+    d_maint = float(surface_m2 * normes["maint_m2"])
+    d_ext = float(eleves_tot * 240)
+    d_ms = float(eleves_tot * 1450)
+    d_fin, d_amo, d_det, d_remb, d_tres = 52000.0, 195000.0, 1550000.0, 145000.0, 440000.0
+
+st.sidebar.markdown("### 2. Recettes & Pôle Hors Contrat")
+f_74 = st.sidebar.number_input("Forfaits & Subv. publiques (74) (€)", value=float(d_f74), step=10000.0)
+c_756 = st.sidebar.number_input("Contributions familles scolarité (756) (€)", value=float(d_c756), step=10000.0)
+a_70 = st.sidebar.number_input("Restauration, internat & annexes (70) (€)", value=float(d_a70), step=10000.0)
+aut_p = st.sidebar.number_input("Autres produits (75/78/79) (€)", value=float(d_autp), step=5000.0)
+
+activer_ufa_cfc = st.sidebar.checkbox("Intégrer un pôle Apprentissage (UFA) & CFC", value=(True if "Lycée" in type_etab or is_agricole else False))
+prod_ufa, ch_ufa, prod_cfc, ch_cfc, app_tot, stag_tot = 0.0, 0.0, 0.0, 0.0, 0, 0
+if activer_ufa_cfc:
+    with st.sidebar.expander("🎓 Détail UFA (Apprentissage) & CFC", expanded=True):
+        app_tot = st.number_input("Effectif apprentis (UFA)", value=110, step=5)
+        prod_ufa = st.number_input("Produits UFA (NPEC OPCO, TA) (€)", value=740000.0, step=10000.0)
+        ch_ufa = st.number_input("Charges UFA (Formateurs, redevance CFA) (€)", value=610000.0, step=10000.0)
+        stag_tot = st.number_input("Stagiaires Formation Continue (CFC)", value=75, step=5)
+        prod_cfc = st.number_input("Produits CFC (Entreprises, CPF, Région) (€)", value=115000.0, step=5000.0)
+        ch_cfc = st.number_input("Charges CFC (Vacataires, com., matériel) (€)", value=132000.0, step=5000.0)
+
+with st.sidebar.expander("👥 3. Granularité RH (Masse Salariale 64)", expanded=True):
+    st.caption("Salaires + charges patronales (hors enseignants payés par l'État).")
+    ms_prive = st.number_input("Enseignants de droit privé (Rempl., hors contrat)", value=float(round(d_ms * 0.14)), step=5000.0)
+    ms_vie_scol = st.number_input("Vie scolaire, éducateurs, surveillants, AESH", value=float(round(d_ms * 0.34)), step=5000.0)
+    ms_admin = st.number_input("Administration, direction, comptabilité", value=float(round(d_ms * 0.27)), step=5000.0)
+    ms_tech = st.number_input("Technique, entretien, accueil & restauration", value=float(round(d_ms * 0.25)), step=5000.0)
+    ms_totale = ms_prive + ms_vie_scol + ms_admin + ms_tech
+
+with st.sidebar.expander("⚙️ 4. Achats, Maintenance & Fluides (60-62)", expanded=True):
+    ach_peda = st.number_input("Budget pédagogique direct (601/606)", value=float(eleves_tot * normes["b_peda"]), step=2000.0)
+    ach_resto = st.number_input("Achats denrées restauration (601)", value=float(max(0.0, d_ach - eleves_tot * normes["b_peda"])), step=5000.0)
+    maint_615 = st.number_input("Maintenance & réparations bâtiments (615)", value=float(d_maint), step=5000.0)
+    fluides_606 = st.number_input("Énergie & fluides (Eau, Gaz, Élec)", value=float(round(d_ext * 0.55)), step=5000.0)
+    autres_ext = st.number_input("Autres charges externes (Assur., honoraires...)", value=float(round(d_ext * 0.45)), step=5000.0)
+    loyers_613 = st.number_input("Loyers immobiliers versés à l'AEP (613)", value=float(d_loy), step=5000.0)
+
+st.sidebar.markdown("### 5. Patrimoine, Dette & Trésorerie")
+amort_68 = st.sidebar.number_input("Dotations aux amortissements (681) (€)", value=float(d_amo), step=5000.0)
+fin_66 = st.sidebar.number_input("Intérêts des emprunts (66) (€)", value=float(d_fin), step=2000.0)
+dette_16 = st.sidebar.number_input("Encours dette immobilière au 31/12 (€)", value=float(d_det), step=25000.0)
+remb_16 = st.sidebar.number_input("Remboursement annuel capital emprunts (€)", value=float(d_remb), step=5000.0)
+treso_51 = st.sidebar.number_input("Trésorerie globale disponible (€)", value=float(d_tres), step=10000.0)
+
+# ==========================================
+# 5. CALCULS DU MOTEUR FINANCIER & SCALPEL
+# ==========================================
+if source_reelle:
+    tp = f_74 + c_756 + a_70 + aut_p
+    ch_achats = ach_peda + ach_resto
+    ch_ext_hors_achats = maint_615 + fluides_606 + autres_ext + loyers_613
+    tc = ch_achats + ch_ext_hors_achats + ms_totale + fin_66 + amort_68
+else:
+    tp = f_74 + c_756 + a_70 + aut_p + prod_ufa + prod_cfc
+    ch_achats = ach_peda + ach_resto
+    ch_ext_hors_achats = maint_615 + fluides_606 + autres_ext + loyers_613
+    tc = ch_achats + ch_ext_hors_achats + ms_totale + fin_66 + amort_68 + ch_ufa + ch_cfc
+
+rn = tp - tc
+caf = rn + amort_68
+autofin_net = caf - remb_16
+tcaf = (caf / tp * 100) if tp > 0 else 0.0
+
+marge_brute = tp - ch_achats
+valeur_ajoutee = marge_brute - ch_ext_hors_achats
+ebe = valeur_ajoutee - ms_totale
+tebe = (ebe / tp * 100) if tp > 0 else 0.0
+rcai = ebe - amort_68 - fin_66
+
+ch_dec = max(1.0, tc - amort_68)
+j_treso = int(round((treso_51 / ch_dec) * 365))
+cap_desend = (dette_16 / caf) if caf > 0 else 99.9
+ro_solde = c_756 - (amort_68 + fin_66 + loyers_613)
+ro_ok = ro_solde >= 0
+
+# Ratios unitaires vs Moyennes Strate
+forfait_eleve_reel = f_74 / max(1, eleves_tot)
+contrib_eleve_reel = c_756 / max(1, eleves_tot)
+maint_m2 = maint_615 / max(1, surface_m2)
+fluides_eleve = fluides_606 / max(1, eleves_tot)
+b_peda_eleve = ach_peda / max(1, eleves_tot)
+poids_ms_tp = (ms_totale / tp * 100) if tp > 0 else 0.0
+poids_admin_ms = (ms_admin / ms_totale * 100) if ms_totale > 0 else 0.0
+
+ch_resto_directes = ach_resto + (ms_tech * 0.45) + (fluides_606 * 0.25)
+marge_resto = a_70 - ch_resto_directes
+tx_couv_resto = (a_70 / ch_resto_directes * 100) if ch_resto_directes > 0 else 100.0
+
+marge_ufa = prod_ufa - ch_ufa
+marge_cfc = prod_cfc - ch_cfc
+
+s_caf = min(30, max(0, int(round((tcaf / normes["taux_caf"]) * 25))))
+s_ro = 25 if ro_ok else max(0, int(round(25 + (ro_solde / max(1.0, c_756)) * 60)))
+s_treso = min(25, max(0, int(round((j_treso / normes["jours_treso"]) * 22))))
+s_det = 20 if cap_desend <= normes["desend_moy"] else (14 if cap_desend <= normes["desend_max"] else (6 if cap_desend <= 11 else 0))
+health_score = min(100, s_caf + s_ro + s_treso + s_det)
+
+# ==========================================
+# 6. INTERFACE PRINCIPALE (4 ONGLETS EXÉCUTIFS)
+# ==========================================
+st.title("Archétype Éducation — Plateforme d'Audit ANC 2018-06 & Prospective")
+badge_src = "Balances ANC 2018-06 certifiées" if source_reelle else "Modèle calibré Observatoire"
+st.caption(f"Établissement : **{etab}** • {normes['type_court']} • {eleves_tot} élèves • {surface_m2} m² • {badge_src}")
+
+onglets = st.tabs([
+    "📊 1. Rétrospective & Dérive RH (2021-2025)",
+    "⚖️ 2. TBI Exécutif, SIG & Normes",
+    "🔪 3. Audit au Scalpel (RH, Bâti, Cantine, UFA)",
+    "🔮 4. Prospective & Feuille de Route (2026-2030)"
+])
+
+# ------------------------------------------
+# ONGLET 1 : RÉTROSPECTIVE & DÉRIVE RH
+# ------------------------------------------
+with onglets[0]:
+    st.subheader("Analyse Rétrospective & Décomposition de la Masse Salariale")
+    if len(balances_parsees) >= 2:
+        ans_r = [b["annee"] or f"Ex.{i+1}" for i, b in enumerate(balances_parsees)]
+        p_r = [b["tp"]/1e6 for b in balances_parsees]
+        c_r = [b["tc"]/1e6 for b in balances_parsees]
+        ms_r = [b["ms_64"]/1e6 for b in balances_parsees]
+        caf_r = [b["caf"]/1e6 for b in balances_parsees]
+        aut_r = [(b["caf"] - (b["remb"] if b["remb"]>0 else remb_16))/1e6 for b in balances_parsees]
+    else:
+        ans_r = ["2021", "2022", "2023", "2024", "2025"]
+        tp_m, tc_m, ms_m, caf_m, aut_m = tp/1e6, tc/1e6, ms_totale/1e6, caf/1e6, autofin_net/1e6
+        p_r = [round(tp_m*0.87, 2), round(tp_m*0.90, 2), round(tp_m*0.93, 2), round(tp_m*0.97, 2), round(tp_m, 2)]
+        c_r = [round(tc_m*0.81, 2), round(tc_m*0.86, 2), round(tc_m*0.91, 2), round(tc_m*0.96, 2), round(tc_m, 2)]
+        ms_r = [round(ms_m*0.82, 2), round(ms_m*0.87, 2), round(ms_m*0.92, 2), round(ms_m*0.96, 2), round(ms_m, 2)]
+        caf_r = [round(p - c + (amort_68/1e6)*0.92, 2) for p, c in zip(p_r[:-1], c_r[:-1])] + [round(caf_m, 2)]
+        aut_r = [round(cf - (remb_16/1e6), 2) for cf in caf_r]
+
+    inv_r = [round((amort_68/1e6)*0.85, 2), round((amort_68/1e6)*1.15, 2), round((amort_68/1e6)*0.95, 2), round((amort_68/1e6)*1.10, 2), round((amort_68/1e6)*1.05, 2)]
+
+    n_int = max(1, len(ans_r) - 1)
+    tcma_p = ((p_r[-1]/p_r[0])**(1/n_int) - 1)*100 if p_r[0] > 0 else 0.0
+    tcma_c = ((c_r[-1]/c_r[0])**(1/n_int) - 1)*100 if c_r[0] > 0 else 0.0
+    tcma_ms = ((ms_r[-1]/ms_r[0])**(1/n_int) - 1)*100 if ms_r[0] > 0 else 0.0
+    ciseau = tcma_c - tcma_p
+
+    kr1, kr2, kr3, kr4 = st.columns(4)
+    kr1.metric("TCMA Produits", f"+{tcma_p:.2f} % / an", "Norme inflation : ~2,0 %/an")
+    kr2.metric("TCMA Charges", f"+{tcma_c:.2f} % / an", f"Effet ciseau : {ciseau:+.2f} pts (Cible <= 0)", delta_color="inverse" if ciseau > 0 else "normal")
+    kr3.metric("TCMA Masse Salariale", f"+{tcma_ms:.2f} % / an", f"Poids : {poids_ms_tp:.1f} % (Moy. {normes['poids_ms']} %)")
+    kr4.metric("CAF Dernier Exercice", f"{caf_r[-1]:.2f} M€", f"Taux : {tcaf:.1f} % (Moy. {normes['taux_caf']} %)")
+
+    cg1, cg2 = st.columns(2)
+    with cg1:
+        st.markdown("**1. Effet de ciseau historique (Produits vs Charges en M€)**")
+        st.line_chart(pd.DataFrame({"Exercice": ans_r, "Produits (M€)": p_r, "Charges (M€)": c_r}).set_index("Exercice"))
+    with cg2:
+        st.markdown("**2. Érosion de la CAF & Autofinancement net (M€)**")
+        st.line_chart(pd.DataFrame({"Exercice": ans_r, "CAF (M€)": caf_r, "Autofinancement Net (M€)": aut_r}).set_index("Exercice"))
+
+    st.markdown("**3. Décomposition de la dérive salariale interne (Compte 64)**")
+    cd1, cd2, cd3 = st.columns(3)
+    gvt_pt = cd1.slider("GVT Mécanique — Ancienneté (pts/an)", 0.5, 2.5, 1.2, 0.1)
+    conv_pt = cd2.slider("Mesures Nationales — EEPNL / SMIC (pts/an)", 0.5, 3.5, 1.6, 0.1)
+    vol_pt = round(tcma_ms - gvt_pt - conv_pt, 2)
+    cd3.metric("Effet Volume (Levier interne)", f"{vol_pt:+.2f} pts / an", "Norme cible : <= +0,30 pt/an", delta_color="inverse" if vol_pt > 0.3 else "normal")
+
+    df_retro_tbl = pd.DataFrame({
+        "Soldes ANC 2018-06": ["Produits d'exploitation (M€)", "Charges d'exploitation (M€)", "Masse salariale Cpte 64 (M€)", "Capacité d'Autofinancement (M€)", "Autofinancement net (M€)", f"Taux de CAF (Moy. strate : {normes['taux_caf']} %)"],
+        **{ans_r[i]: [f"{p_r[i]:.2f}", f"{c_r[i]:.2f}", f"{ms_r[i]:.2f}", f"{caf_r[i]:.2f}", f"{aut_r[i]:.2f}", f"{(caf_r[i]/p_r[i]*100):.1f} %"] for i in range(len(ans_r))}
+    })
+    st.dataframe(df_retro_tbl, hide_index=True, use_container_width=True)
+
+    atouts_list = [
+        f"Socle de recettes récurrent de {tp/1e6:.2f} M€ porté par les dotations publiques et les familles.",
+        f"Taux de CAF de {tcaf:.1f} % ({'supérieur' if tcaf >= normes['taux_caf'] else 'inférieur'} à la moyenne observatoire de {normes['taux_caf']} %).",
+        "Marges d'optimisation identifiées sur la mutualisation support et la tarification des services annexes."
+    ]
+    vig_list = [
+        f"Résorber l'effet ciseau ({ciseau:+.2f} pts/an) en plafonnant la hausse des achats et fluides sous l'inflation.",
+        f"Ramener l'effet volume RH ({vol_pt:+.2f} pts/an) sous la norme de +0,30 pt/an via un contrôle strict des remplacements.",
+        "Indexation indispensable des forfaits publics et contributions familles sur l'évolution réelle des coûts."
+    ]
+    pdf_retro_bytes = build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, tcma_p, tcma_c, tcma_ms, gvt_pt, conv_pt, vol_pt, atouts_list, vig_list)
+    st.download_button("📑 Télécharger le Dossier Rétrospectif Complet (PDF 2 pages)", data=pdf_retro_bytes, file_name=f"Dossier_Retro_{etab.replace(' ','_')}.pdf", mime="application/pdf", type="primary")
+
+    afficher_synthese_unique(
+        "Rétrospective & Dynamique RH (2021-2025)",
+        f"Les charges progressent de +{tcma_c:.2f} %/an contre +{tcma_p:.2f} %/an pour les produits (effet ciseau de {ciseau:+.2f} pts/an). Le poids de la masse salariale interne atteint {poids_ms_tp:.1f} % des produits (moyenne strate : {normes['poids_ms']} %), et le taux de CAF s'établit à {tcaf:.1f} % (moyenne strate : {normes['taux_caf']} %).",
+        f"Sur +{tcma_ms:.2f} %/an de dérive salariale, {(gvt_pt+conv_pt):.2f} pts sont structurels (ancienneté GVT et revalorisations conventionnelles EEPNL/SMIC), tandis que {vol_pt:+.2f} pts relèvent de l'organisation interne.",
+        f"Pour l'exercice à venir, limiter la hausse des achats et fluides sous +1,8 %/an, contenir l'effet volume RH sous +0,30 pt/an (révision des remplacements courts) et négocier une revalorisation des dotations ({normes['financeur']}) alignée sur l'inflation subie."
+    )
+
+# ------------------------------------------
+# ONGLET 2 : TBI EXÉCUTIF, SIG & NORMES
+# ------------------------------------------
+with onglets[1]:
+    st.subheader("Tableau de Bord Exécutif (TBI), SIG & Positionnement Normatif")
+
+    hs1, hs2 = st.columns([1, 2.5])
+    with hs1:
+        st.metric("HEALTH SCORE ANC 2018-06", f"{health_score} / 100", "Sain >= 70 | Vigilance 45-69")
+    with hs2:
+        if health_score >= 70:
+            st.success(f"**Structure financière solide ({health_score}/100) :** EBE à {tebe:.1f} % (moy. {normes['taux_ebe']} %), CAF à {tcaf:.1f} % (cible {normes['taux_caf']} %), Règle d'Or respectée ({ro_solde:+,.0f} €) et trésorerie à {j_treso} jours.".replace(",", " "))
+        elif health_score >= 45:
+            st.warning(f"**Zone de vigilance ({health_score}/100) :** Écart détecté par rapport aux moyennes du profil sur la CAF ({tcaf:.1f} % vs {normes['taux_caf']} %) ou la Règle d'Or ({ro_solde:+,.0f} €). Ajustements requis au prochain budget.".replace(",", " "))
+        else:
+            st.error(f"**Alerte structurelle ({health_score}/100) :** Dégradation marquée par rapport aux normes du secteur (CAF {tcaf:.1f} %, trésorerie {j_treso} j, Règle d'Or {ro_solde:+,.0f} €). Plan d'ajustement immédiat nécessaire.".replace(",", " "))
+
+    c_sig1, c_sig2 = st.columns([1.45, 1])
+    with c_sig1:
+        st.markdown("**1. Cascade des Soldes Intermédiaires de Gestion (ANC 2018-06) vs Normes**")
+        df_sig = pd.DataFrame([
+            {"Solde Intermédiaire de Gestion": "Total Produits d'Exploitation (70/74/75)", "Montant (€)": f"{tp:,.0f} €".replace(",", " "), "% Produits": "100,0 %", "Moyenne / Norme": "Base 100 %"},
+            {"Solde Intermédiaire de Gestion": "- Achats consommés (Pédagogie + Denrées 60)", "Montant (€)": f"-{ch_achats:,.0f} €".replace(",", " "), "% Produits": f"{ch_achats/tp*100:.1f} %", "Moyenne / Norme": "12 - 18 %"},
+            {"Solde Intermédiaire de Gestion": "= MARGE BRUTE GLOBALE", "Montant (€)": f"{marge_brute:,.0f} €".replace(",", " "), "% Produits": f"{marge_brute/tp*100:.1f} %", "Moyenne / Norme": "82 - 88 %"},
+            {"Solde Intermédiaire de Gestion": "- Services ext., Maintenance, Fluides & Loyers", "Montant (€)": f"-{ch_ext_hors_achats:,.0f} €".replace(",", " "), "% Produits": f"{ch_ext_hors_achats/tp*100:.1f} %", "Moyenne / Norme": "18 - 25 %"},
+            {"Solde Intermédiaire de Gestion": "= VALEUR AJOUTÉE (VA)", "Montant (€)": f"{valeur_ajoutee:,.0f} €".replace(",", " "), "% Produits": f"{valeur_ajoutee/tp*100:.1f} %", "Moyenne / Norme": "55 - 65 %"},
+            {"Solde Intermédiaire de Gestion": "- Masse Salariale OGEC / Asso (Cpte 64)", "Montant (€)": f"-{ms_totale:,.0f} €".replace(",", " "), "% Produits": f"{poids_ms_tp:.1f} %", "Moyenne / Norme": f"Moy. {normes['poids_ms']} %"},
+            {"Solde Intermédiaire de Gestion": "= EXCÉDENT BRUT D'EXPLOITATION (EBE)", "Montant (€)": f"{ebe:,.0f} €".replace(",", " "), "% Produits": f"{tebe:.1f} %", "Moyenne / Norme": f"Moy. {normes['taux_ebe']} %"},
+            {"Solde Intermédiaire de Gestion": "- Dotations Amortissements & Intérêts (68 + 66)", "Montant (€)": f"-{(amort_68+fin_66):,.0f} €".replace(",", " "), "% Produits": f"{(amort_68+fin_66)/tp*100:.1f} %", "Moyenne / Norme": "8 - 12 %"},
+            {"Solde Intermédiaire de Gestion": "= RÉSULTAT NET COMPTABLE (RCAI)", "Montant (€)": f"{rn:+,.0f} €".replace(",", " "), "% Produits": f"{rn/tp*100:+.1f} %", "Moyenne / Norme": "Norme >= 0 %"},
+            {"Solde Intermédiaire de Gestion": "= CAPACITÉ D'AUTOFINANCEMENT (CAF)", "Montant (€)": f"{caf:,.0f} €".replace(",", " "), "% Produits": f"{tcaf:.1f} %", "Moyenne / Norme": f"Cible >= {normes['taux_caf']} %"},
+            {"Solde Intermédiaire de Gestion": "- Remboursement annuel capital dette (164)", "Montant (€)": f"-{remb_16:,.0f} €".replace(",", " "), "% Produits": f"{remb_16/tp*100:.1f} %", "Moyenne / Norme": "4 - 8 %"},
+            {"Solde Intermédiaire de Gestion": "= AUTOFINANCEMENT NET DISPONIBLE", "Montant (€)": f"{autofin_net:+,.0f} €".replace(",", " "), "% Produits": f"{autofin_net/tp*100:+.1f} %", "Moyenne / Norme": "Norme >= 0 €"},
+        ])
+        st.dataframe(df_sig, hide_index=True, use_container_width=True)
+
+    with c_sig2:
+        st.markdown("**2. Positionnement Bilan & Solvabilité**")
+        st.metric("Capacité de Désendettement", f"{cap_desend:.1f} ans", f"Moy. strate : {normes['desend_moy']} ans | Max : {normes['desend_max']} ans", delta_color="normal" if cap_desend <= normes["desend_max"] else "inverse")
+        st.metric("Trésorerie de Sécurité", f"{j_treso} jours", f"Cible observatoire : {normes['jours_treso']} jours ({treso_51/1e6:.2f} M€)", delta_color="normal" if j_treso >= 60 else "inverse")
+        st.metric("Règle d'Or Immobilière", f"{ro_solde:+,.0f} €".replace(",", " "), "Norme : >= 0 € (Contrib. 756 - Immo)", delta_color="normal" if ro_ok else "inverse")
+
+        st.markdown("**3. Tableau Comparatif : Établissement vs Moyennes du Profil**")
+        df_bench = pd.DataFrame([
+            {"Indicateur": "Forfait public / élève", "Établissement": f"{forfait_eleve_reel:,.0f} €", "Moyenne / Norme": f"{normes['forfait_eleve']:,.0f} €", "Statut": "OK" if forfait_eleve_reel >= normes['forfait_eleve']*0.95 else "Sous moy."},
+            {"Indicateur": "Contribution familles / élève", "Établissement": f"{contrib_eleve_reel:,.0f} €", "Moyenne / Norme": f"{normes['contrib_eleve']:,.0f} €", "Statut": "OK" if contrib_eleve_reel >= normes['contrib_eleve']*0.9 else "Sous moy."},
+            {"Indicateur": "Taux d'EBE (%)", "Établissement": f"{tebe:.1f} %", "Moyenne / Norme": f"{normes['taux_ebe']} %", "Statut": "OK" if tebe >= normes['taux_ebe'] else "Vigilance"},
+            {"Indicateur": "Taux de CAF (%)", "Établissement": f"{tcaf:.1f} %", "Moyenne / Norme": f"{normes['taux_caf']} %", "Statut": "OK" if tcaf >= normes['taux_caf'] else "Vigilance"},
+            {"Indicateur": "Poids MS interne (%)", "Établissement": f"{poids_ms_tp:.1f} %", "Moyenne / Norme": f"{normes['poids_ms']} %", "Statut": "OK" if poids_ms_tp <= normes['poids_ms'] else "Élevé"},
+            {"Indicateur": "Maintenance / m²", "Établissement": f"{maint_m2:.1f} €/m²", "Moyenne / Norme": f"{normes['maint_m2']} €/m²", "Statut": "OK" if maint_m2 <= normes['maint_m2']*1.2 else "Élevé"},
+            {"Indicateur": "Effort pédagogique / élève", "Établissement": f"{b_peda_eleve:,.0f} €", "Moyenne / Norme": f"{normes['b_peda']} €", "Statut": "OK" if b_peda_eleve >= normes['b_peda']*0.9 else "Sous moy."},
+        ])
+        st.dataframe(df_bench, hide_index=True, use_container_width=True)
+
+    synthese_tbi_lines = [
+        f"• Positionnement global : Health Score de {health_score}/100. L'EBE s'établit à {tebe:.1f} % (moyenne strate : {normes['taux_ebe']} %) et la CAF à {tcaf:.1f} % (cible : {normes['taux_caf']} %).",
+        f"• Ressources par élève : Forfait public à {forfait_eleve_reel:,.0f} €/élève (moyenne : {normes['forfait_eleve']} €) et contribution familles à {contrib_eleve_reel:,.0f} €/élève (moyenne : {normes['contrib_eleve']} €).",
+        f"• Arbitrage budgétaire : {'Sanctuariser l autofinancement net (' + f'{autofin_net:+,.0f} €' + ') pour financer le renouvellement courant.' if autofin_net >= 0 else 'Corriger le déficit d autofinancement net (' + f'{autofin_net:+,.0f} €' + ') avant tout nouvel emprunt.'}"
+    ]
+    pdf_tbi_bytes = build_pdf_tbi(
+        etab, normes, eleves_tot, surface_m2, health_score,
+        tp/1e6, ch_achats/1e6, ch_ext_hors_achats/1e6, valeur_ajoutee/1e6, ms_totale/1e6,
+        ebe/1e6, (amort_68+fin_66)/1e6, rn/1e6, caf/1e6, remb_16/1e6, autofin_net/1e6,
+        dette_16/1e6, cap_desend, treso_51/1e6, j_treso, ro_solde/1e6,
+        maint_m2, b_peda_eleve, marge_ufa/1e6, marge_cfc/1e6, synthese_tbi_lines
+    )
+    st.download_button("📑 Télécharger le TBI Exécutif & Grille des Normes (PDF 1 page)", data=pdf_tbi_bytes, file_name=f"TBI_Executif_{etab.replace(' ','_')}.pdf", mime="application/pdf", type="primary")
+
+    afficher_synthese_unique(
+        "Tableau de Bord Exécutif & Positionnement Normatif",
+        f"Avec une Valeur Ajoutée de {valeur_ajoutee/1e6:.2f} M€ et un EBE de {ebe/1e6:.2f} M€ ({tebe:.1f} % vs {normes['taux_ebe']} % en moyenne), la CAF atteint {caf/1e6:.2f} M€ ({tcaf:.1f} % vs {normes['taux_caf']} % attendus). Le forfait public ressort à {forfait_eleve_reel:,.0f} €/élève (norme : {normes['forfait_eleve']} €) et la contribution familiale à {contrib_eleve_reel:,.0f} €/élève (norme : {normes['contrib_eleve']} €).",
+        f"L'autofinancement net disponible après remboursement du capital de la dette ({remb_16/1e6:.2f} M€) s'établit à {autofin_net:+,.0f} €, avec une capacité de désendettement de {cap_desend:.1f} ans (moyenne strate : {normes['desend_moy']} ans) et {j_treso} jours de trésorerie (cible : {normes['jours_treso']} jours).".replace(",", " "),
+        f"Aligner la contribution familiale sur la moyenne du profil ({normes['contrib_eleve']} €/élève) si la Règle d'Or ({ro_solde:+,.0f} €) est en tension, et objectiver auprès de la collectivité ({normes['financeur']}) tout écart négatif sur le forfait d'externat par élève.".replace(",", " ")
+    )
+
+# ------------------------------------------
+# ONGLET 3 : AUDIT AU SCALPEL (RH, BÂTI, CANTINE, UFA)
+# ------------------------------------------
+with onglets[2]:
+    st.subheader("Audit Analytique au Scalpel : Centres de Coût vs Normes Métiers")
+
+    st.markdown("#### 1. Cartographie RH Interne (Décomposition du Compte 64 vs Moyennes)")
+    crh1, crh2 = st.columns([1.45, 1])
+    with crh1:
+        df_rh = pd.DataFrame([
+            {"Pôle RH (Hors profs État)": "Enseignants de droit privé (Rempl., hors contrat)", "Budget (€)": f"{ms_prive:,.0f} €".replace(",", " "), "Part MS": f"{ms_prive/max(1,ms_totale)*100:.1f} %", "Moyenne Strate": "12 - 18 %", "Coût / Élève": f"{ms_prive/eleves_tot:,.0f} €"},
+            {"Pôle RH (Hors profs État)": "Vie scolaire, éducateurs, surveillants, AESH", "Budget (€)": f"{ms_vie_scol:,.0f} €".replace(",", " "), "Part MS": f"{ms_vie_scol/max(1,ms_totale)*100:.1f} %", "Moyenne Strate": "32 - 38 %", "Coût / Élève": f"{ms_vie_scol/eleves_tot:,.0f} €"},
+            {"Pôle RH (Hors profs État)": "Administration, direction, comptabilité", "Budget (€)": f"{ms_admin:,.0f} €".replace(",", " "), "Part MS": f"{poids_admin_ms:.1f} %", "Moyenne Strate": f"Moy. {normes['poids_admin']} %", "Coût / Élève": f"{ms_admin/eleves_tot:,.0f} €"},
+            {"Pôle RH (Hors profs État)": "Technique, entretien, accueil & restauration", "Budget (€)": f"{ms_tech:,.0f} €".replace(",", " "), "Part MS": f"{ms_tech/max(1,ms_totale)*100:.1f} %", "Moyenne Strate": "22 - 28 %", "Coût / Élève": f"{ms_tech/eleves_tot:,.0f} €"},
+        ])
+        st.dataframe(df_rh, hide_index=True, use_container_width=True)
+        if poids_admin_ms > normes["poids_admin"] + 4.0:
+            st.warning(f"**Point de vigilance RH :** Le pôle Administration/Direction représente **{poids_admin_ms:.1f} %** de la masse salariale interne contre une moyenne observatoire de **{normes['poids_admin']} %**.")
+    with crh2:
+        st.bar_chart(pd.DataFrame({
+            "Pôle": ["Profs Privé", "Vie Scolaire", "Admin/Dir.", "Tech/Resto"],
+            "Montant (€)": [ms_prive, ms_vie_scol, ms_admin, ms_tech]
+        }).set_index("Pôle"), color="#1d4ed8")
+
+    st.divider()
+
+    st.markdown("#### 2. Patrimoine, Maintenance (Cpte 615) & Énergie")
+    cb1, cb2, cb3 = st.columns(3)
+    cb1.metric("Maintenance & Réparations (615)", f"{maint_615:,.0f} €".replace(",", " "), f"{maint_m2:.1f} €/m² (Moy. strate : {normes['maint_m2']} €/m²)", delta_color="inverse" if maint_m2 > normes["maint_m2"]*1.25 else "normal")
+    cb2.metric("Énergie & Fluides (606)", f"{fluides_606:,.0f} €".replace(",", " "), f"{fluides_eleve:,.0f} €/él. (Moy. strate : {normes['fluides_eleve']} €/él.)", delta_color="inverse" if fluides_eleve > normes["fluides_eleve"]*1.2 else "normal")
+    cb3.metric("Solde Règle d'Or Immobilière", f"{ro_solde:+,.0f} €".replace(",", " "), "Norme : >= 0 € (Contrib. 756 - Immo)", delta_color="normal" if ro_ok else "inverse")
+
+    if not ro_ok:
+        st.error(f"**Rupture de la Règle d'Or ({ro_solde:+,.0f} €) :** Les contributions des familles ({c_756:,.0f} €) ne couvrent pas les charges immobilières ({(amort_68+fin_66+loyers_613):,.0f} €). Écart à combler : **{int(round(abs(ro_solde)/eleves_tot))} € / élève / an**.".replace(",", " "))
+
+    st.divider()
+
+    cs1, cs2 = st.columns(2)
+    with cs1:
+        st.markdown("#### 3. Restauration & Internat (Norme couverture >= 100 %)")
+        st.metric("Marge sur coûts directs Resto/Internat", f"{marge_resto:+,.0f} €".replace(",", " "), f"Couverture : {tx_couv_resto:.1f} % (Norme : >= 100 %)", delta_color="normal" if marge_resto >= 0 else "inverse")
+        if marge_resto < 0:
+            st.error(f"**Subventionnement croisé interdit :** La restauration/internat perd **{abs(marge_resto):,.0f} €** sur ses coûts directs. Revalorisation tarifaire requise : **+{abs(marge_resto)/max(1,internes_tot):,.0f} € / usager / an**.".replace(",", " "))
+        else:
+            st.success("Tarification conforme à la norme d'équilibre (>= 100 % des coûts directs couverts).")
+
+    with cs2:
+        st.markdown("#### 4. Effort Pédagogique Direct")
+        st.metric("Budget Pédagogique / Élève", f"{b_peda_eleve:,.0f} € / élève", f"Moyenne observatoire : {normes['b_peda']} € / élève", delta_color="normal" if b_peda_eleve >= normes["b_peda"]*0.85 else "inverse")
+        if b_peda_eleve < normes["b_peda"] * 0.85:
+            st.warning(f"**Sous-dotation pédagogique :** À {b_peda_eleve:,.0f} €/élève (contre {normes['b_peda']} € en moyenne), le budget pédagogique sert de variable d'ajustement aux charges fixes.")
+        else:
+            st.success("Effort pédagogique conforme aux standards nationaux du profil.")
+
+    if activer_ufa_cfc:
+        st.divider()
+        st.markdown("#### 5. Pôle Hors Contrat : Apprentissage (UFA) vs Formation Continue (CFC)")
+        cu1, cu2 = st.columns(2)
+        cu1.metric("Marge Nette Apprentissage (UFA)", f"{marge_ufa:+,.0f} €".replace(",", " "), f"{marge_ufa/max(1,app_tot):+,.0f} €/apprenti (Norme : >= +800 €/app.)")
+        cu2.metric("Marge Nette Formation Continue (CFC)", f"{marge_cfc:+,.0f} €".replace(",", " "), f"{stag_tot} stagiaires (Norme : >= 0 €)", delta_color="normal" if marge_cfc >= 0 else "inverse")
+        if marge_ufa > 0 > marge_cfc:
+            st.error(f"**Destruction de marge :** Le déficit de la Formation Continue (**{marge_cfc:,.0f} €**) ampute l'excédent de l'Apprentissage (**+{marge_ufa:,.0f} €**).".replace(",", " "))
+
+    afficher_synthese_unique(
+        "Audit Analytique au Scalpel",
+        f"La maintenance ressort à {maint_m2:.1f} €/m² (moyenne : {normes['maint_m2']} €/m²), les fluides à {fluides_eleve:,.0f} €/élève (moyenne : {normes['fluides_eleve']} €), l'encadrement administratif à {poids_admin_ms:.1f} % de la MS interne (moyenne : {normes['poids_admin']} %) et le budget pédagogique à {b_peda_eleve:,.0f} €/élève (moyenne : {normes['b_peda']} €).",
+        f"La restauration/internat affiche un taux de couverture de {tx_couv_resto:.1f} % ({marge_resto:+,.0f} €) et le pôle hors contrat dégage {marge_ufa:+,.0f} € sur l'UFA contre {marge_cfc:+,.0f} € sur la CFC.".replace(",", " "),
+        "Ajuster les tarifs de demi-pension/internat pour atteindre 100 % de couverture des coûts directs, conditionner l'ouverture des groupes CFC à un seuil de rentabilité positif, et sanctuariser la dotation pédagogique par élève dans le budget prévisionnel."
+    )
+
+# ------------------------------------------
+# ONGLET 4 : PROSPECTIVE & FEUILLE DE ROUTE (2026-2030)
+# ------------------------------------------
+with onglets[3]:
+    st.subheader("Simulateur Quinquennal & Arbitrage Budgétaire (2026-2030)")
+
+    sp1, sp2, sp3, sp4 = st.columns(4)
+    with sp1:
+        st.markdown("**1. Fonctionnement & RH**")
+        tx_ms_proj = st.slider("Évolution MS interne (%/an)", 0.5, 5.0, 2.2, 0.1)
+        tx_ext_proj = st.slider("Inflation Achats/Fluides/Maint. (%/an)", 0.5, 5.0, 1.8, 0.1)
+    with sp2:
+        st.markdown("**2. Effectifs & Recettes**")
+        tx_el_proj = st.slider("Évolution effectifs élèves (%/an)", -3.0, 4.0, 0.5, 0.1)
+        tx_forf_proj = st.slider("Indexation Forfaits & Tarifs (%/an)", 0.0, 5.0, 2.0, 0.1)
+    with sp3:
+        st.markdown("**3. Investissement (PPI)**")
+        ppi_annuel = st.slider("Enveloppe PPI cible (M€/an)", 0.0, 2.5, 0.35, 0.05)
+        exec_pct = st.slider("Taux d'exécution PPI (%)", 50, 100, 85, 5)
+        taux_subv_ppi = st.slider("Subventions Région/AEP/MASA (%)", 0, 70, 30, 5)
+    with sp4:
+        st.markdown("**4. OPEX induits & Dette**")
+        opex_ppi_pct = st.slider("OPEX induits par le PPI (% du PPI)", -2.0, 5.0, 1.5, 0.5)
+        duree_emprunt = st.selectbox("Durée nouveaux emprunts", [15, 20, 25], index=1)
+
+    ans_p = ["2026", "2027", "2028", "2029", "2030"]
+    ppi_reel = ppi_annuel * (exec_pct / 100.0)
+    subv_ppi_an = ppi_reel * (taux_subv_ppi / 100.0)
+    emprunt_ppi_an = max(0.0, (ppi_reel - subv_ppi_an) * 0.65)
+    autofin_ppi_an = max(0.0, (ppi_reel - subv_ppi_an) * 0.35)
+
+    p_list, c_list, caf_list, subv_list, det_list, des_list, tr_list, jtr_list = [], [], [], [], [], [], [], []
+    curr_p = tp / 1e6
+    curr_ms = ms_totale / 1e6
+    curr_autres_ch = (ch_achats + ch_ext_hors_achats + (0 if source_reelle else ch_ufa + ch_cfc)) / 1e6
+    curr_amo = amort_68 / 1e6
+    curr_fin = fin_66 / 1e6
+    curr_det = dette_16 / 1e6
+    curr_remb = remb_16 / 1e6
+    curr_treso = treso_51 / 1e6
+    opex_cumul = 0.0
+
+    for _ in ans_p:
+        curr_p = curr_p * (1 + tx_el_proj/100.0) * (1 + tx_forf_proj/100.0)
+        curr_ms = curr_ms * (1 + tx_ms_proj/100.0)
+        curr_autres_ch = curr_autres_ch * (1 + tx_ext_proj/100.0)
+        opex_cumul += ppi_reel * (opex_ppi_pct / 100.0)
+        curr_amo += ppi_reel / 20.0
+        curr_fin += emprunt_ppi_an * 0.035
+
+        tot_c_opex = curr_ms + curr_autres_ch + opex_cumul + curr_amo + curr_fin
+        curr_caf = (curr_p - tot_c_opex) + curr_amo
+        curr_det = max(0.0, curr_det - curr_remb + emprunt_ppi_an)
+        curr_remb_tot = curr_remb + (emprunt_ppi_an / duree_emprunt)
+        curr_treso = curr_treso + curr_caf - curr_remb_tot - autofin_ppi_an
+        curr_des = (curr_det / curr_caf) if curr_caf > 0 else 99.9
+        c_dec_an = max(0.01, tot_c_opex - curr_amo)
+        curr_j = (curr_treso / c_dec_an) * 365
+
+        p_list.append(round(curr_p, 2))
+        c_list.append(round(tot_c_opex, 2))
+        caf_list.append(round(curr_caf, 2))
+        subv_list.append(round(subv_ppi_an, 2))
+        det_list.append(round(curr_det, 2))
+        des_list.append(round(curr_des, 1))
+        tr_list.append(round(curr_treso, 2))
+        jtr_list.append(round(curr_j, 0))
+
+    df_proj = pd.DataFrame({
+        "Année": ans_p,
+        "Produits (M€)": p_list,
+        "Charges + OPEX (M€)": c_list,
+        "CAF (M€)": caf_list,
+        "Subv. PPI (M€)": subv_list,
+        "Dette 31/12 (M€)": det_list,
+        "Désendettement (ans)": des_list,
+        "Trésorerie (M€)": tr_list,
+        "Trésorerie (jours)": jtr_list
+    })
+
+    kp1, kp2, kp3, kp4 = st.columns(4)
+    tcaf_2030 = (caf_list[-1]/p_list[-1]*100)
+    kp1.metric("CAF Projetée 2030", f"+{caf_list[-1]:.2f} M€", f"Taux : {tcaf_2030:.1f} % (Cible : {normes['taux_caf']} %)")
+    kp2.metric("Désendettement 2030", f"{des_list[-1]:.1f} ans", f"Moy. : {normes['desend_moy']} a. | Max : {normes['desend_max']} a.", delta_color="normal" if des_list[-1] <= normes["desend_max"] else "inverse")
+    kp3.metric("Encours Dette 2030", f"{det_list[-1]:.2f} M€", f"Variation période : {(det_list[-1]-det_list[0]):+.2f} M€")
+    kp4.metric("Trésorerie 2030", f"{jtr_list[-1]:.0f} jours", f"Cible : {normes['jours_treso']} j ({tr_list[-1]:.2f} M€)", delta_color="normal" if jtr_list[-1] >= 60 else "inverse")
+
+    gp_c1, gp_c2 = st.columns(2)
+    with gp_c1:
+        st.markdown("**Trajectoire Produits vs Charges + OPEX induits (M€)**")
+        st.line_chart(df_proj.set_index("Année")[["Produits (M€)", "Charges + OPEX (M€)"]])
+    with gp_c2:
+        st.markdown("**Trajectoire CAF & Trésorerie disponible (M€)**")
+        st.line_chart(df_proj.set_index("Année")[["CAF (M€)", "Trésorerie (M€)"]])
+
+    st.dataframe(df_proj, hide_index=True, use_container_width=True)
+
+    feuille_route = [
+        f"1. Solvabilité & Normes : CAF cible de {caf_list[-1]:.2f} M€ en 2030 ({tcaf_2030:.1f} % vs {normes['taux_caf']} % attendus) et désendettement à {des_list[-1]:.1f} ans (seuil max {normes['desend_max']} ans).",
+        f"2. Maîtrise des charges : Plafonner la MS interne à +{tx_ms_proj:.1f} %/an et contenir les achats, fluides et maintenance à +{tx_ext_proj:.1f} %/an.",
+        f"3. Politique tarifaire & Dotations : Indexer les forfaits publics ({normes['financeur']}) et contributions familles à +{tx_forf_proj:.1f} %/an et équilibrer cantine/CFC.",
+        f"4. Investissement (PPI) & OPEX : Calibrer le PPI exécuté à {ppi_reel:.2f} M€/an ({taux_subv_ppi} % de subventions) en intégrant {opex_ppi_pct:+.1f} %/an d'OPEX induits.",
+        f"5. Dette & Liquidité : Amortir les nouveaux emprunts sur {duree_emprunt} ans et maintenir la trésorerie au-dessus de {normes['jours_treso']} jours de charges décaissables."
+    ]
+
+    pdf_pro_bytes = build_pdf_prospective(etab, normes, ppi_annuel, exec_pct, df_proj, feuille_route)
+    st.download_button("📑 Télécharger la Synthèse Prospective 2026-2030 (PDF 1 page)", data=pdf_pro_bytes, file_name=f"Synthese_Prospective_2026_2030_{etab.replace(' ','_')}.pdf", mime="application/pdf", type="primary")
+
+    afficher_synthese_unique(
+        "Prospective Quinquennale & Trajectoire 2026-2030",
+        f"À l'horizon 2030, le taux de CAF ressort à {tcaf_2030:.1f} % (cible observatoire : {normes['taux_caf']} %), la capacité de désendettement s'établit à {des_list[-1]:.1f} ans (moyenne strate : {normes['desend_moy']} ans, seuil : {normes['desend_max']} ans) et la trésorerie atteint {jtr_list[-1]:.0f} jours (cible : {normes['jours_treso']} jours).",
+        f"La trajectoire intègre un PPI exécuté de {ppi_reel:.2f} M€/an cofinancé à hauteur de {taux_subv_ppi} % et absorbe {opex_ppi_pct:+.1f} %/an de charges de fonctionnement induites.",
+        f"Pour sécuriser l'équilibre budgétaire annuel jusqu'en 2030, maintenir impérativement un différentiel positif entre l'indexation des recettes (+{tx_forf_proj:.1f} %/an) et la dérive des achats/maintenance (+{tx_ext_proj:.1f} %/an), tout en fléchant les emprunts sur {duree_emprunt} ans."
+    )
