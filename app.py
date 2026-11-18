@@ -143,6 +143,11 @@ def afficher_synthese_unique(titre, constat, points_appui, leviers_budget):
         st.markdown(f"**2. Points d'appui & marges de manœuvre :** {points_appui}")
         st.markdown(f"**3. Leviers d'ajustement du budget prévisionnel :** {leviers_budget}")
 
+def afficher_aide_pedagogique_onglet(titre_aide, points_cles):
+    with st.expander(f"💡 Comprendre les chiffres de cet onglet — {titre_aide}", expanded=False):
+        for notion, explication in points_cles:
+            st.markdown(f"* **{notion} :** {explication}")
+
 # ==========================================
 # 2. INGESTION BALANCES COMPTABLES (ANC 2018-06)
 # ==========================================
@@ -273,8 +278,8 @@ def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, tc
         ciseau = tcma_c - tcma_p
         var_caf = caf_r[-1] - caf_r[0]
         kpis = [
-            ("TCMA PRODUITS", f"+{tcma_p:.2f} % / an", "Dynamique des ressources", "#059669"),
-            ("TCMA CHARGES", f"+{tcma_c:.2f} % / an", f"Écart : {ciseau:+.2f} pts vs Prod.", "#dc2626" if ciseau > 0.3 else "#d97706"),
+            ("TCMA PRODUITS", f"+{tcma_p:.2f} % / an", "Rythme annuel recettes", "#059669"),
+            ("TCMA CHARGES", f"+{tcma_c:.2f} % / an", f"Effet ciseau : {ciseau:+.2f} pts", "#dc2626" if ciseau > 0.3 else "#d97706"),
             ("TCMA MASSE SALARIALE", f"+{tcma_ms:.2f} % / an", f"Poids : {(ms_r[-1]/p_r[-1]*100):.1f} % (Norme {normes['poids_ms']}%)", "#1d4ed8"),
             ("ÉVOLUTION CAF", f"{caf_r[-1]:.2f} M€", f"Variation : {var_caf:+.2f} M€ (Cible {normes['taux_caf']}%)", "#059669" if var_caf >= 0 else "#dc2626"),
         ]
@@ -295,8 +300,8 @@ def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, tc
 
         ax.text(0.52, 0.785, "2. TRAJECTOIRE DE LA CAF & AUTOFINANCEMENT NET", fontsize=8.1, fontweight="bold", color="#0f172a", transform=ax.transAxes)
         g2 = fig.add_axes([0.54, 0.595, 0.41, 0.175])
-        g2.plot(ans_r, caf_r, marker="^", color="#059669", lw=2, label="CAF")
-        g2.plot(ans_r, aut_r, marker="s", color="#d97706", lw=2, label="Autofin. Net")
+        g2.plot(ans_r, caf_r, marker="^", color="#059669", lw=2, label="CAF (Épargne brute)")
+        g2.plot(ans_r, aut_r, marker="s", color="#d97706", lw=2, label="Autofin. Net (après dette)")
         g2.grid(True, linestyle="--", alpha=0.5)
         g2.tick_params(labelsize=7)
         g2.legend(fontsize=6.8, loc="upper left")
@@ -313,7 +318,7 @@ def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, tc
         diag_eq = [
             f"• Enveloppe moyenne exécutée : {moy_inv:.2f} M€ / an.",
             f"• Taux de renouvellement vs amortissements : {(moy_inv / max(0.01, (caf_r[-1] - (p_r[-1]-c_r[-1]))) * 100):.0f} % (Norme >= 100 %).",
-            "• Enjeu : Préserver la valeur nette comptable du bâti sans dégrader la Règle d'Or ni la trésorerie."
+            "• Enjeu : Préserver l'état des bâtiments sans entamer la Règle d'Or ni la trésorerie."
         ]
         _draw_lines(ax, 0.525, 0.480, diag_eq, wrap_w=56, step_y=0.018, gap_item=0.006, fontsize=7.0)
 
@@ -343,7 +348,7 @@ def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, tc
         _box(ax, 0.04, 0.052, 0.92, 0.082, fc="#fffbeb", ec="#fcd34d")
         ax.text(0.055, 0.114, "SYNTHÈSE DE L'EFFET DE CISEAU & POSITIONNEMENT NORMATIF", fontsize=7.6, fontweight="bold", color="#92400e", transform=ax.transAxes)
         cis_lines = [
-            f"• Les charges (+{tcma_c:.2f} %/an) progressent {'plus vite' if ciseau > 0 else 'moins vite'} que les produits (+{tcma_p:.2f} %/an), créant un effet ciseau de {ciseau:+.2f} pts/an.",
+            f"• Effet ciseau ({ciseau:+.2f} pts/an) : les dépenses (+{tcma_c:.2f} %/an) progressent {'plus vite' if ciseau > 0 else 'moins vite'} que les recettes (+{tcma_p:.2f} %/an).",
             f"• Le taux de CAF s'établit à {(caf_r[-1]/p_r[-1]*100):.1f} % en {ans_r[-1]} contre une moyenne observatoire de {normes['taux_caf']} % pour ce profil d'établissement."
         ]
         _draw_lines(ax, 0.055, 0.092, cis_lines, wrap_w=124, step_y=0.017, gap_item=0.004, fontsize=7.0)
@@ -351,7 +356,6 @@ def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, tc
         pdf.savefig(fig)
         plt.close(fig)
 
-        # PAGE 2 : DÉRIVE RH & BILAN STRATÉGIQUE
         fig2 = plt.figure(figsize=(8.27, 11.69), dpi=150)
         ax2 = fig2.add_axes([0, 0, 1, 1])
         ax2.axis("off")
@@ -368,10 +372,10 @@ def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, tc
         grh.tick_params(labelsize=7.5)
 
         _box(ax2, 0.04, 0.515, 0.92, 0.125, fc="#f8fafc", ec="#cbd5e1")
-        ax2.text(0.055, 0.618, "LECTURE MANAGÉRIALE : FACTEURS SUBIS VS LEVIER INTERNE (NORME VOLUME <= 0,3 PT/AN)", fontsize=7.7, fontweight="bold", color="#0f172a", transform=ax2.transAxes)
+        ax2.text(0.055, 0.618, "LECTURE PÉDAGOGIQUE : FACTEURS SUBIS VS LEVIER INTERNE (NORME VOLUME <= 0,3 PT/AN)", fontsize=7.7, fontweight="bold", color="#0f172a", transform=ax2.transAxes)
         rh_lines = [
-            f"• Sur +{tcma_ms:.2f} %/an d'évolution salariale, {(gvt_pt+conv_pt):.2f} points sont structurels (GVT ancienneté + revalorisations conventionnelles EEPNL/SMIC).",
-            f"• {vol_pt:+.2f} points relèvent directement de l'organisation interne (créations de postes, remplacements non compensés, heures supplémentaires).",
+            f"• Sur +{tcma_ms:.2f} %/an de hausse salariale, {(gvt_pt+conv_pt):.2f} points sont automatiques (ancienneté GVT + revalorisations conventionnelles EEPNL/SMIC).",
+            f"• {vol_pt:+.2f} points dépendent directement des décisions de gestion (créations de postes, remplacements non compensés, heures supplémentaires).",
             f"• Le poids global de la MS interne atteint {(ms_r[-1]/p_r[-1]*100):.1f} % des produits (Moyenne observatoire du profil : {normes['poids_ms']} %)."
         ]
         _draw_lines(ax2, 0.055, 0.592, rh_lines, wrap_w=122, step_y=0.017, gap_item=0.005, fontsize=7.1)
@@ -397,19 +401,21 @@ def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ebe
     ax.axis("off")
     _header_pdf(ax, "ARCHÉTYPE ÉDUCATION  |  PLATEFORME D'ARBITRAGE ANC 2018-06 & NORMES", f"ÉTABLISSEMENT : {etab.upper()} ({eleves} ÉLÈVES  •  {surf} M²  •  {normes['strate'].upper()})")
 
+    # Bannière Health Score sans chevauchement (séparateur vertical à x=0.255)
     sc_col = "#059669" if score >= 70 else ("#d97706" if score >= 45 else "#dc2626")
     sc_bg = "#ecfdf5" if score >= 70 else ("#fffbeb" if score >= 45 else "#fef2f2")
     _box(ax, 0.04, 0.815, 0.92, 0.084, fc=sc_bg, ec=sc_col, lw=1.4)
-    ax.text(0.06, 0.875, "HEALTH SCORE ANC 2018-06", fontsize=7.5, fontweight="bold", color="#475569", transform=ax.transAxes)
-    ax.text(0.06, 0.832, f"{score}/100", fontsize=19.0, fontweight="bold", color=sc_col, transform=ax.transAxes)
+    ax.text(0.055, 0.876, "HEALTH SCORE ANC 2018-06", fontsize=7.0, fontweight="bold", color="#475569", transform=ax.transAxes)
+    ax.text(0.055, 0.832, f"{score}/100", fontsize=17.0, fontweight="bold", color=sc_col, transform=ax.transAxes)
+    ax.plot([0.255, 0.255], [0.823, 0.891], color="#cbd5e1", lw=1.0, transform=ax.transAxes)
+
     statut_msg = "STRUCTURE FINANCIÈRE SAINE ET CONFORME AUX NORMES" if score >= 70 else ("TENSION D'ÉPARGNE OU D'ÉQUILIBRE PAR RAPPORT AUX MOYENNES" if score >= 45 else "ALERTE STRUCTURELLE : ÉCART CRITIQUE AUX NORMES")
-    ax.text(0.24, 0.872, statut_msg, fontsize=8.3, fontweight="bold", color=sc_col, transform=ax.transAxes)
+    ax.text(0.275, 0.874, statut_msg, fontsize=8.0, fontweight="bold", color=sc_col, transform=ax.transAxes)
     tcaf = (caf / tp * 100) if tp > 0 else 0
     tebe = (ebe / tp * 100) if tp > 0 else 0
-    ax.text(0.24, 0.848, f"EBE : {tebe:.1f}% (Moy. {normes['taux_ebe']}%) | CAF : {tcaf:.1f}% (Cible {normes['taux_caf']}%) | Désend. : {cap_d:.1f} ans (Moy. {normes['desend_moy']} a.)", fontsize=7.2, color="#1e293b", transform=ax.transAxes)
-    ax.text(0.24, 0.826, f"Règle d'Or : {ro_solde:+.2f} M€ (Norme >= 0) | Tréso : {j_treso} j (Cible {normes['jours_treso']} j) | Pédago : {b_peda:.0f} €/él. (Norme {normes['b_peda']} €)", fontsize=7.2, color="#1e293b", transform=ax.transAxes)
+    ax.text(0.275, 0.850, f"EBE : {tebe:.1f}% (Moy. {normes['taux_ebe']}%) • CAF : {tcaf:.1f}% (Cible {normes['taux_caf']}%) • Désendettement : {cap_d:.1f} ans (Moy. {normes['desend_moy']} a.)", fontsize=6.8, color="#1e293b", transform=ax.transAxes)
+    ax.text(0.275, 0.827, f"Règle d'Or : {ro_solde:+.2f} M€ (Norme >= 0) • Trésorerie : {j_treso} j (Cible {normes['jours_treso']} j) • Pédagogie : {b_peda:.0f} €/él.", fontsize=6.8, color="#1e293b", transform=ax.transAxes)
 
-    # Bloc 1 : Cascade SIG avec Normes
     _box(ax, 0.04, 0.450, 0.50, 0.350, fc="#ffffff")
     ax.add_patch(Rectangle((0.04, 0.762), 0.50, 0.038, facecolor="#1e293b", transform=ax.transAxes))
     ax.text(0.055, 0.775, "1. CASCADE DES SIG VS MOYENNE STRATE", color="white", fontsize=8.0, fontweight="bold", transform=ax.transAxes)
@@ -435,7 +441,6 @@ def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ebe
         ax.text(0.532, ys, nrm, ha="right", fontsize=6.5, color="#64748b", transform=ax.transAxes)
         ys -= 0.027
 
-    # Bloc 2 : Scalpel vs Normes
     _box(ax, 0.56, 0.635, 0.40, 0.165, fc="#ffffff")
     ax.add_patch(Rectangle((0.56, 0.762), 0.40, 0.038, facecolor="#1e293b", transform=ax.transAxes))
     ax.text(0.575, 0.775, "2. RATIOS MÉTIERS VS NORMES", color="white", fontsize=8.0, fontweight="bold", transform=ax.transAxes)
@@ -451,7 +456,6 @@ def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ebe
         ax.text(0.948, ysc, v, ha="right", fontsize=7.0, fontweight="bold", color="#0f172a", transform=ax.transAxes)
         ysc -= 0.028
 
-    # Bloc 3 : Patrimoine & Dette vs Normes
     _box(ax, 0.56, 0.450, 0.40, 0.170, fc="#ffffff")
     ax.add_patch(Rectangle((0.56, 0.582), 0.40, 0.038, facecolor="#1e293b", transform=ax.transAxes))
     ax.text(0.575, 0.595, "3. DETTE & TRÉSORERIE VS NORMES", color="white", fontsize=8.0, fontweight="bold", transform=ax.transAxes)
@@ -467,25 +471,23 @@ def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ebe
         ax.text(0.948, yd, v, ha="right", fontsize=7.0, fontweight="bold", color="#0f172a", transform=ax.transAxes)
         yd -= 0.028
 
-    # Bloc 4 : Synthèse Unifiée
     _box(ax, 0.04, 0.275, 0.92, 0.160, fc="#f8fafc", ec="#94a3b8")
     ax.text(0.055, 0.415, "4. SYNTHÈSE EXÉCUTIVE & CLÉS D'AJUSTEMENT BUDGÉTAIRE", fontsize=8.0, fontweight="bold", color="#0f172a", transform=ax.transAxes)
     _draw_lines(ax, 0.055, 0.390, synthese_tbi, wrap_w=124, step_y=0.017, gap_item=0.005, fontsize=7.0)
 
-    # Référentiel bas de page
-    ax.text(0.04, 0.248, f"GRILLE DES MOYENNES & SEUILS DE VIGILANCE ({normes['strate'].upper()})", fontsize=7.6, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+    ax.text(0.04, 0.248, f"REPÈRES PÉDAGOGIQUES & NORMES DU PROFIL ({normes['strate'].upper()})", fontsize=7.6, fontweight="bold", color="#0f172a", transform=ax.transAxes)
     refs = [
-        ("EBE & TAUX DE CAF", "Performance & Épargne", [f"EBE moy. : {normes['taux_ebe']} %", f"CAF cible : >= {normes['taux_caf']} %", "Alerte CAF : < 4,0 %"]),
-        ("RÈGLE D'OR IMMO", "Contrib. 756 - Immo", ["Norme : >= 0 €", "Étanchéité scolaire", "Alerte si déficit"]),
-        ("DÉSENDETTEMENT", "Encours Dette / CAF", [f"Moy. strate : {normes['desend_moy']} ans", f"Seuil max : {normes['desend_max']} ans", "Refus prêt : > 10 ans"]),
-        ("TRÉSORERIE & RH", "Liquidité & Rigidité", [f"Tréso cible : {normes['jours_treso']} j", f"MS moy. : {normes['poids_ms']} % prod.", f"Maint. moy. : {normes['maint_m2']} €/m²"]),
+        ("EBE & TAUX DE CAF", "Épargne dégagée par l'activité", [f"EBE moy. : {normes['taux_ebe']} %", f"CAF cible : >= {normes['taux_caf']} %", "Sert à payer les emprunts"]),
+        ("RÈGLE D'OR IMMO", "Familles paient les murs", ["Norme : >= 0 €", "756 >= Amort + Int + Loyers", "Forfait public = scolaire"]),
+        ("DÉSENDETTEMENT", "Nb d'années pour solder dette", [f"Moy. strate : {normes['desend_moy']} ans", f"Seuil max : {normes['desend_max']} ans", "Alerte banque : > 10 ans"]),
+        ("TRÉSORERIE & RH", "Matelas de sécurité & salaires", [f"Tréso cible : {normes['jours_treso']} j", f"MS moy. : {normes['poids_ms']} % prod.", f"Maint. moy. : {normes['maint_m2']} €/m²"]),
     ]
     for i, (rt, rf, rbullets) in enumerate(refs):
         rx = 0.04 + i * 0.233
         _box(ax, rx, 0.055, 0.218, 0.180, fc="#ffffff")
         ax.text(rx + 0.012, 0.215, rt, fontsize=7.2, fontweight="bold", color="#0f172a", transform=ax.transAxes)
-        ax.text(rx + 0.012, 0.193, rf, fontsize=6.5, color="#64748b", transform=ax.transAxes)
-        _draw_lines(ax, rx + 0.012, 0.160, [f"• {b}" for b in rbullets], wrap_w=32, step_y=0.024, gap_item=0.004, fontsize=6.9)
+        ax.text(rx + 0.012, 0.193, rf, fontsize=6.4, color="#64748b", transform=ax.transAxes)
+        _draw_lines(ax, rx + 0.012, 0.160, [f"• {b}" for b in rbullets], wrap_w=32, step_y=0.024, gap_item=0.004, fontsize=6.8)
 
     _footer_pdf(ax, "Rapport certifié conforme aux règles ANC 2018-06  •  Cabinet QUINZE", "Page 1/1")
     fig.savefig(buf, format="pdf")
@@ -696,7 +698,6 @@ cap_desend = (dette_16 / caf) if caf > 0 else 99.9
 ro_solde = c_756 - (amort_68 + fin_66 + loyers_613)
 ro_ok = ro_solde >= 0
 
-# Ratios unitaires vs Moyennes Strate
 forfait_eleve_reel = f_74 / max(1, eleves_tot)
 contrib_eleve_reel = c_756 / max(1, eleves_tot)
 maint_m2 = maint_615 / max(1, surface_m2)
@@ -719,11 +720,36 @@ s_det = 20 if cap_desend <= normes["desend_moy"] else (14 if cap_desend <= norme
 health_score = min(100, s_caf + s_ro + s_treso + s_det)
 
 # ==========================================
-# 6. INTERFACE PRINCIPALE (4 ONGLETS EXÉCUTIFS)
+# 6. INTERFACE PRINCIPALE + GUIDE PÉDAGOGIQUE
 # ==========================================
 st.title("Archétype Éducation — Plateforme d'Audit ANC 2018-06 & Prospective")
 badge_src = "Balances ANC 2018-06 certifiées" if source_reelle else "Modèle calibré Observatoire"
 st.caption(f"Établissement : **{etab}** • {normes['type_court']} • {eleves_tot} élèves • {surface_m2} m² • {badge_src}")
+
+with st.expander("📖 Guide pédagogique : comprendre les chiffres et ratios (Spécial Conseil d'Administration & Président d'OGEC)", expanded=False):
+    st.markdown("Ce référentiel traduit les termes comptables (norme associative **ANC 2018-06**) en repères concrets de gestion pour éclairer les votes du Conseil d'Administration :")
+    gp_c1, gp_c2, gp_c3 = st.columns(3)
+    with gp_c1:
+        st.markdown("**1. La Règle d'Or Patrimoniale**")
+        st.markdown(
+            "La loi interdit d'utiliser l'argent public (forfaits commune, département, région) pour acheter ou rénover des murs. "
+            "**En clair :** les *contributions des familles* (compte 756) doivent couvrir à elles seules l'usure comptable des bâtiments (*amortissements*), les *intérêts d'emprunts* et les *loyers* versés à l'association propriétaire (AEP). "
+            "Si le solde est négatif, l'école puise dans son fonctionnement quotidien pour payer ses murs."
+        )
+    with gp_c2:
+        st.markdown("**2. EBE, CAF et Autofinancement Net**")
+        st.markdown(
+            "* **EBE (Excédent Brut d'Exploitation) :** ce que l'école gagne sur son activité courante avant de payer les banques et l'usure des bâtiments. S'il est négatif, le modèle perd de l'argent chaque jour.\n"
+            "* **CAF (Capacité d'Autofinancement) :** la trésorerie potentielle générée sur l'année (Résultat net + amortissements). Cible saine : **7 à 8 %** des recettes.\n"
+            "* **Autofinancement Net :** ce qu'il reste réellement dans la caisse une fois remboursée l'échéance annuelle de capital à la banque."
+        )
+    with gp_c3:
+        st.markdown("**3. Dette, Trésorerie & Effet Ciseau**")
+        st.markdown(
+            "* **Capacité de désendettement (en années) :** `Dette totale / CAF`. Indique combien d'années il faudrait pour tout rembourser si toute la CAF y passait. **Sain : < 6 ans** | **Alerte : > 8 ans**.\n"
+            "* **Trésorerie (en jours) :** nombre de jours pendant lesquels l'école peut payer ses salaires et factures sans aucune rentrée d'argent. **Cible : 75 à 90 jours** (indispensable pour passer l'été).\n"
+            "* **Effet Ciseau :** lorsque les dépenses augmentent chaque année plus vite que les recettes, réduisant progressivement la CAF."
+        )
 
 onglets = st.tabs([
     "📊 1. Rétrospective & Dérive RH (2021-2025)",
@@ -732,11 +758,14 @@ onglets = st.tabs([
     "🔮 4. Prospective & Feuille de Route (2026-2030)"
 ])
 
-# ------------------------------------------
-# ONGLET 1 : RÉTROSPECTIVE & DÉRIVE RH
-# ------------------------------------------
 with onglets[0]:
     st.subheader("Analyse Rétrospective & Décomposition de la Masse Salariale")
+    afficher_aide_pedagogique_onglet("Dynamique passée & Salaires", [
+        ("TCMA (Taux de Croissance Annuel Moyen)", "C'est le rythme moyen d'augmentation par an entre 2021 et 2025. Si les produits progressent de +2,5 %/an et les charges de +4,0 %/an, l'écart (+1,5 pt) est un « effet ciseau » qui grignote la trésorerie chaque année."),
+        ("GVT (Glissement Vieillesse Technicité)", "Augmentation automatique de la masse salariale liée à l'ancienneté du personnel déjà en place, même sans aucune embauche nouvelle."),
+        ("Effet Volume (Levier interne)", "Part de la hausse des salaires qui vient des décisions de l'établissement (créations de postes, remplacements d'absents, heures supplémentaires). Une gestion maîtrisée vise <= +0,30 pt/an.")
+    ])
+
     if len(balances_parsees) >= 2:
         ans_r = [b["annee"] or f"Ex.{i+1}" for i, b in enumerate(balances_parsees)]
         p_r = [b["tp"]/1e6 for b in balances_parsees]
@@ -808,11 +837,13 @@ with onglets[0]:
         f"Pour l'exercice à venir, limiter la hausse des achats et fluides sous +1,8 %/an, contenir l'effet volume RH sous +0,30 pt/an (révision des remplacements courts) et négocier une revalorisation des dotations ({normes['financeur']}) alignée sur l'inflation subie."
     )
 
-# ------------------------------------------
-# ONGLET 2 : TBI EXÉCUTIF, SIG & NORMES
-# ------------------------------------------
 with onglets[1]:
     st.subheader("Tableau de Bord Exécutif (TBI), SIG & Positionnement Normatif")
+    afficher_aide_pedagogique_onglet("Lecture du Compte de Résultat (SIG) & Score /100", [
+        ("Health Score (/100)", "Note globale de santé financière combinant 4 piliers : l'épargne dégagée (CAF), le respect de la Règle d'Or immobilière, le matelas de trésorerie et le niveau d'endettement. Au-dessus de 70/100, la situation est saine."),
+        ("Cascade des SIG (Soldes Intermédiaires de Gestion)", "Permet de lire le compte de résultat par étages : la Valeur Ajoutée mesure ce qu'il reste après les fournisseurs ; l'EBE mesure ce qu'il reste après les salaires internes ; la CAF mesure la trésorerie dégagée avant remboursement des emprunts."),
+        ("Colonne Moyenne / Norme", "Permet de comparer immédiatement l'établissement aux moyennes constatées dans les établissements de même catégorie (Observatoire économique).")
+    ])
 
     hs1, hs2 = st.columns([1, 2.5])
     with hs1:
@@ -862,10 +893,15 @@ with onglets[1]:
         ])
         st.dataframe(df_bench, hide_index=True, use_container_width=True)
 
+    if autofin_net >= 0:
+        arb_txt = f"• Arbitrage budgétaire : Sanctuariser l'autofinancement net ({autofin_net:+,.0f} €) pour financer le renouvellement courant.".replace(",", " ")
+    else:
+        arb_txt = f"• Arbitrage budgétaire : Corriger le déficit d'autofinancement net ({autofin_net:+,.0f} €) avant tout nouvel emprunt.".replace(",", " ")
+
     synthese_tbi_lines = [
         f"• Positionnement global : Health Score de {health_score}/100. L'EBE s'établit à {tebe:.1f} % (moyenne strate : {normes['taux_ebe']} %) et la CAF à {tcaf:.1f} % (cible : {normes['taux_caf']} %).",
         f"• Ressources par élève : Forfait public à {forfait_eleve_reel:,.0f} €/élève (moyenne : {normes['forfait_eleve']} €) et contribution familles à {contrib_eleve_reel:,.0f} €/élève (moyenne : {normes['contrib_eleve']} €).",
-        f"• Arbitrage budgétaire : {'Sanctuariser l autofinancement net (' + f'{autofin_net:+,.0f} €' + ') pour financer le renouvellement courant.' if autofin_net >= 0 else 'Corriger le déficit d autofinancement net (' + f'{autofin_net:+,.0f} €' + ') avant tout nouvel emprunt.'}"
+        arb_txt
     ]
     pdf_tbi_bytes = build_pdf_tbi(
         etab, normes, eleves_tot, surface_m2, health_score,
@@ -883,11 +919,13 @@ with onglets[1]:
         f"Aligner la contribution familiale sur la moyenne du profil ({normes['contrib_eleve']} €/élève) si la Règle d'Or ({ro_solde:+,.0f} €) est en tension, et objectiver auprès de la collectivité ({normes['financeur']}) tout écart négatif sur le forfait d'externat par élève.".replace(",", " ")
     )
 
-# ------------------------------------------
-# ONGLET 3 : AUDIT AU SCALPEL (RH, BÂTI, CANTINE, UFA)
-# ------------------------------------------
 with onglets[2]:
     st.subheader("Audit Analytique au Scalpel : Centres de Coût vs Normes Métiers")
+    afficher_aide_pedagogique_onglet("Pourquoi découper le budget par activité ?", [
+        ("Éviter les vases communicants cachés", "Un résultat global positif peut masquer une cantine très déficitaire financée sur le dos du matériel pédagogique des élèves."),
+        ("Maintenance au m² (Compte 615)", "Permet de vérifier si l'entretien courant des bâtiments est suffisant (sinon le patrimoine se dégrade) ou excessif (signe de bâtiments vétustes ou énergivores)."),
+        ("Taux de couverture Restauration / Internat", "Doit être au minimum de 100 % sur les coûts directs (denrées + personnel de cuisine/service + fluides cuisine) pour ne pas ponctionner le budget scolaire.")
+    ])
 
     st.markdown("#### 1. Cartographie RH Interne (Décomposition du Compte 64 vs Moyennes)")
     crh1, crh2 = st.columns([1.45, 1])
@@ -953,11 +991,13 @@ with onglets[2]:
         "Ajuster les tarifs de demi-pension/internat pour atteindre 100 % de couverture des coûts directs, conditionner l'ouverture des groupes CFC à un seuil de rentabilité positif, et sanctuariser la dotation pédagogique par élève dans le budget prévisionnel."
     )
 
-# ------------------------------------------
-# ONGLET 4 : PROSPECTIVE & FEUILLE DE ROUTE (2026-2030)
-# ------------------------------------------
 with onglets[3]:
     st.subheader("Simulateur Quinquennal & Arbitrage Budgétaire (2026-2030)")
+    afficher_aide_pedagogique_onglet("Tester les décisions d'investissement sur 5 ans", [
+        ("PPI (Plan Pluriannuel d'Investissement)", "Enveloppe de gros travaux (toitures, isolation, salles spécialisées) programmée chaque année sur 5 ans."),
+        ("OPEX induits par le PPI", "Frais de fonctionnement nouveaux générés par un bâtiment neuf (ménage, assurance, maintenance) ou, à l'inverse, économies d'énergie (-1 % à -2 %) générées par une rénovation thermique."),
+        ("Condition de soutenabilité", "Un scénario est votable en Conseil d'Administration si, en 2030, la trésorerie reste au-dessus de 60-90 jours et la capacité de désendettement sous 8 ans.")
+    ])
 
     sp1, sp2, sp3, sp4 = st.columns(4)
     with sp1:
