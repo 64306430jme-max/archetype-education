@@ -230,11 +230,9 @@ def _footer_pdf(ax, gauche, page_txt):
     ax.text(0.04, 0.020, gauche, fontsize=7.0, color="#64748b")
     ax.text(0.96, 0.020, page_txt, ha="right", fontsize=7.0, fontweight="bold", color="#475569")
 
-# --- PDF 1 : DOSSIER RÉTROSPECTIF (2 PAGES) ---
 def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, tcma_p, tcma_c, tcma_ms, gvt_pt, conv_pt, vol_pt, atouts_txt, vig_txt):
     buf = io.BytesIO()
     with PdfPages(buf) as pdf:
-        # PAGE 1
         fig = plt.figure(figsize=(8.27, 11.69), dpi=150)
         ax = fig.add_axes([0, 0, 1, 1])
         ax.axis("off")
@@ -255,7 +253,6 @@ def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, tc
             ax.text(kx + 0.012, 0.845, kv, fontsize=12.0, fontweight="bold", color=kc)
             ax.text(kx + 0.012, 0.823, ks, fontsize=6.8, color="#64748b")
 
-        # Graphique 1 : Effet Ciseau
         ax.text(0.04, 0.785, "1. EFFET DE CISEAU HISTORIQUE (PRODUITS VS CHARGES)", fontsize=8.2, fontweight="bold", color="#0f172a")
         g1 = fig.add_axes([0.06, 0.595, 0.41, 0.175])
         g1.plot(ans_r, p_r, marker="o", color="#2563eb", lw=2, label="Produits")
@@ -264,7 +261,6 @@ def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, tc
         g1.tick_params(labelsize=7)
         g1.legend(fontsize=6.8, loc="upper left")
 
-        # Graphique 2 : Érosion CAF & Autofinancement
         ax.text(0.52, 0.785, "2. TRAJECTOIRE DE LA CAF & AUTOFINANCEMENT NET", fontsize=8.2, fontweight="bold", color="#0f172a")
         g2 = fig.add_axes([0.54, 0.595, 0.41, 0.175])
         g2.plot(ans_r, caf_r, marker="^", color="#059669", lw=2, label="CAF")
@@ -273,7 +269,6 @@ def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, tc
         g2.tick_params(labelsize=7)
         g2.legend(fontsize=6.8, loc="upper left")
 
-        # Graphique 3 : Investissement
         ax.text(0.04, 0.545, "3. EFFORT D'INVESTISSEMENT & RENOUVELLEMENT PATRIMONIAL (M€)", fontsize=8.2, fontweight="bold", color="#0f172a")
         g3 = fig.add_axes([0.06, 0.375, 0.41, 0.155])
         g3.bar(ans_r, inv_r, color="#1e40af", width=0.5)
@@ -288,7 +283,6 @@ def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, tc
         ax.text(0.525, 0.422, "• Enjeu : Préserver la valeur nette comptable du bâti", fontsize=7.2, color="#475569")
         ax.text(0.525, 0.398, "  sans dégrader la Règle d'Or ni la trésorerie.", fontsize=7.2, color="#475569")
 
-        # Tableau rétrospectif
         ax.text(0.04, 0.335, "TABLEAU RÉTROSPECTIF DES SOLDES ANC 2018-06 (2021-2025)", fontsize=8.2, fontweight="bold", color="#0f172a")
         tax = fig.add_axes([0.04, 0.145, 0.92, 0.175])
         tax.axis("off")
@@ -320,7 +314,6 @@ def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, tc
         pdf.savefig(fig)
         plt.close(fig)
 
-        # PAGE 2 : DÉRIVE RH & BILAN STRATÉGIQUE
         fig2 = plt.figure(figsize=(8.27, 11.69), dpi=150)
         ax2 = fig2.add_axes([0, 0, 1, 1])
         ax2.axis("off")
@@ -366,15 +359,13 @@ def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, tc
         plt.close(fig2)
     return buf.getvalue()
 
-# --- PDF 2 : TBI EXÉCUTIF & SCALPEL (1 PAGE) ---
-def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ebe, amo_fin, rn, caf, remb, aut, dette, cap_d, treso, j_tr, ro_solde, maint_m2, b_peda, m_ufa, m_cfc):
+def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ebe, amo_fin, rn, caf, remb, aut, dette, cap_d, treso, j_treso, ro_solde, maint_m2, b_peda, m_ufa, m_cfc):
     buf = io.BytesIO()
     fig = plt.figure(figsize=(8.27, 11.69), dpi=150)
     ax = fig.add_axes([0, 0, 1, 1])
     ax.axis("off")
     _header_pdf(ax, "ARCHÉTYPE ÉDUCATION  |  PLATEFORME D'ARBITRAGE ANC 2018-06 & SCALPEL", f"ÉTABLISSEMENT : {etab.upper()} ({eleves} ÉLÈVES  •  {surf} M²  •  {normes['strate'].upper()})")
 
-    # Bannière Health Score
     sc_col = "#059669" if score >= 70 else ("#d97706" if score >= 45 else "#dc2626")
     sc_bg = "#ecfdf5" if score >= 70 else ("#fffbeb" if score >= 45 else "#fef2f2")
     _box(ax, 0.04, 0.815, 0.92, 0.084, fc=sc_bg, ec=sc_col, lw=1.4)
@@ -384,9 +375,8 @@ def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ebe
     ax.text(0.24, 0.872, statut_msg, fontsize=8.4, fontweight="bold", color=sc_col)
     tcaf = (caf / tp * 100) if tp > 0 else 0
     ax.text(0.24, 0.848, f"Taux CAF : {tcaf:.1f} % (Cible : {normes['taux_caf']} %)  |  Désendettement : {cap_d:.1f} ans (Seuil : {normes['desend_max']} ans)", fontsize=7.3, color="#1e293b")
-    ax.text(0.24, 0.826, f"Règle d'Or Immo : {ro_solde:+.2f} M€  |  Trésorerie : {j_tr} jours (Cible : {normes['jours_treso']} j)  |  Pédagogie : {b_peda:.0f} €/élève", fontsize=7.3, color="#1e293b")
+    ax.text(0.24, 0.826, f"Règle d'Or Immo : {ro_solde:+.2f} M€  |  Trésorerie : {j_treso} jours (Cible : {normes['jours_treso']} j)  |  Pédagogie : {b_peda:.0f} €/élève", fontsize=7.3, color="#1e293b")
 
-    # Bloc 1 : Cascade SIG
     _box(ax, 0.04, 0.450, 0.46, 0.350, fc="#ffffff")
     ax.add_patch(Rectangle((0.04, 0.762), 0.46, 0.038, facecolor="#1e293b", transform=ax.transAxes))
     ax.text(0.055, 0.775, "1. CASCADE DES SIG (ANC 2018-06)", color="white", fontsize=8.2, fontweight="bold")
@@ -411,7 +401,6 @@ def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ebe
         ax.text(0.488, ys, val, ha="right", fontsize=7.3, fontweight="bold" if bld else "normal", color=col)
         ys -= 0.027
 
-    # Bloc 2 : Scalpel Métier
     _box(ax, 0.52, 0.635, 0.44, 0.165, fc="#ffffff")
     ax.add_patch(Rectangle((0.52, 0.762), 0.44, 0.038, facecolor="#1e293b", transform=ax.transAxes))
     ax.text(0.535, 0.775, "2. SCALPEL ANALYTIQUE & MÉTIER", color="white", fontsize=8.2, fontweight="bold")
@@ -427,7 +416,6 @@ def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ebe
         ax.text(0.945, ysc, v, ha="right", fontsize=7.3, fontweight="bold", color="#0f172a")
         ysc -= 0.028
 
-    # Bloc 3 : Endettement & Règle d'Or
     _box(ax, 0.52, 0.450, 0.44, 0.170, fc="#ffffff")
     ax.add_patch(Rectangle((0.52, 0.582), 0.44, 0.038, facecolor="#1e293b", transform=ax.transAxes))
     ax.text(0.535, 0.595, "3. PATRIMOINE, DETTE & TRÉSORERIE", color="white", fontsize=8.2, fontweight="bold")
@@ -435,7 +423,7 @@ def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ebe
         ("Encours Dette Immobilière :", f"{dette:.2f} M€"),
         ("Capacité de Désendettement :", f"{cap_d:.1f} ans (Seuil : {normes['desend_max']} ans)"),
         ("Solde Règle d'Or Immobilière :", f"{ro_solde:+.2f} M€"),
-        ("Trésorerie Disponible :", f"{treso:.2f} M€ ({j_tr} jours)"),
+        ("Trésorerie Disponible :", f"{treso:.2f} M€ ({j_treso} jours)"),
     ]
     yd = 0.552
     for k, v in det_items:
@@ -443,14 +431,12 @@ def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ebe
         ax.text(0.945, yd, v, ha="right", fontsize=7.3, fontweight="bold", color="#0f172a")
         yd -= 0.028
 
-    # Bloc 4 : Arbitrage 3 scénarios
     _box(ax, 0.04, 0.305, 0.92, 0.130, fc="#f8fafc")
     ax.text(0.055, 0.415, "4. ARBITRAGE DES SCÉNARIOS BUDGÉTAIRES (CA & DIALOGUE FINANCEURS)", fontsize=8.0, fontweight="bold", color="#0f172a")
     ax.text(0.055, 0.388, "1. Scénario Fil de l'eau (Sans ajustement) : Érosion continue de la CAF sous l'effet de l'inflation salariale et énergétique.", fontsize=7.2, color="#1e293b")
     ax.text(0.055, 0.362, "2. Scénario PPI Intégral sans indexation : Tension de trésorerie sous 36 mois et dégradation du ratio de désendettement.", fontsize=7.2, color="#b91c1c")
     ax.text(0.055, 0.336, "3. Scénario Cible Optimisé : Maîtrise des charges fixes, équilibre cantine/CFC et indexation des forfaits/contributions.", fontsize=7.2, color="#065f46", fontweight="bold")
 
-    # Référentiel bas de page
     ax.text(0.04, 0.275, f"RÉFÉRENTIEL ANC 2018-06 & NORMES OBSERVATOIRE ({normes['strate'].upper()})", fontsize=7.8, fontweight="bold", color="#0f172a")
     refs = [
         ("TAUX DE CAF", "CAF / Produits d'expl.", [f"Cible : >= {normes['taux_caf']} %", "Vigilance : < 5,0 %", "Alerte : < 3,0 %"]),
@@ -473,7 +459,6 @@ def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ebe
     plt.close(fig)
     return buf.getvalue()
 
-# --- PDF 3 : SYNTHÈSE PROSPECTIVE 2026-2030 (1 PAGE) ---
 def build_pdf_prospective(etab, normes, ppi_annuel, exec_pct, df_proj, feuille_route):
     buf = io.BytesIO()
     fig = plt.figure(figsize=(8.27, 11.69), dpi=150)
@@ -502,7 +487,6 @@ def build_pdf_prospective(etab, normes, ppi_annuel, exec_pct, df_proj, feuille_r
         ax.text(kx + 0.012, 0.845, kv, fontsize=12.0, fontweight="bold", color=kc)
         ax.text(kx + 0.012, 0.823, ks, fontsize=6.8, color="#64748b")
 
-    # Graphiques
     ax.text(0.04, 0.785, "1. PROJECTION PRODUITS VS CHARGES (INCLUANT OPEX INDUITS PPI)", fontsize=8.0, fontweight="bold", color="#0f172a")
     gp1 = fig.add_axes([0.06, 0.595, 0.41, 0.175])
     gp1.plot(df_proj["Année"], df_proj["Produits (M€)"], marker="o", color="#2563eb", lw=2, label="Produits")
@@ -519,7 +503,6 @@ def build_pdf_prospective(etab, normes, ppi_annuel, exec_pct, df_proj, feuille_r
     gp2.tick_params(labelsize=7)
     gp2.legend(fontsize=6.8, loc="upper left")
 
-    # Tableau pluriannuel
     ax.text(0.04, 0.548, "TABLEAU PLURIANNUEL DES TRAJECTOIRES BUDGÉTAIRES ANC 2018-06 (2026-2030)", fontsize=8.1, fontweight="bold", color="#0f172a")
     tp_ax = fig.add_axes([0.04, 0.340, 0.92, 0.195])
     tp_ax.axis("off")
@@ -544,7 +527,6 @@ def build_pdf_prospective(etab, normes, ppi_annuel, exec_pct, df_proj, feuille_r
         elif c == 0:
             cell.get_text().set_ha("left")
 
-    # Feuille de route exhaustive
     _box(ax, 0.04, 0.055, 0.92, 0.270, fc="#ecfdf5", ec="#6ee7b7")
     ax.text(0.055, 0.305, "FEUILLE DE ROUTE EXHAUSTIVE CHEF D'ÉTABLISSEMENT & DGS : TRAJECTOIRE SOUTENABLE", fontsize=7.6, fontweight="bold", color="#065f46")
     yfr = 0.283
@@ -674,36 +656,30 @@ caf = rn + amort_68
 autofin_net = caf - remb_16
 tcaf = (caf / tp * 100) if tp > 0 else 0.0
 
-# Cascade SIG
 marge_brute = tp - ch_achats
 valeur_ajoutee = marge_brute - ch_ext_hors_achats
 ebe = valeur_ajoutee - ms_totale
 rcai = ebe - amort_68 - fin_66
 
-# Bilan & Règle d'Or
 ch_dec = max(1.0, tc - amort_68)
 j_treso = int(round((treso_51 / ch_dec) * 365))
 cap_desend = (dette_16 / caf) if caf > 0 else 99.9
 ro_solde = c_756 - (amort_68 + fin_66 + loyers_613)
 ro_ok = ro_solde >= 0
 
-# Ratios Scalpel
 maint_m2 = maint_615 / max(1, surface_m2)
 fluides_eleve = fluides_606 / max(1, eleves_tot)
 b_peda_eleve = ach_peda / max(1, eleves_tot)
 poids_ms_tp = (ms_totale / tp * 100) if tp > 0 else 0.0
 poids_admin_ms = (ms_admin / ms_totale * 100) if ms_totale > 0 else 0.0
 
-# Restauration / Internat (coûts directs : denrées + 45% RH technique/cuisine + 25% fluides)
 ch_resto_directes = ach_resto + (ms_tech * 0.45) + (fluides_606 * 0.25)
 marge_resto = a_70 - ch_resto_directes
 tx_couv_resto = (a_70 / ch_resto_directes * 100) if ch_resto_directes > 0 else 100.0
 
-# UFA / CFC
 marge_ufa = prod_ufa - ch_ufa
 marge_cfc = prod_cfc - ch_cfc
 
-# Health Score ANC 2018-06 (/100)
 s_caf = min(30, max(0, int(round((tcaf / normes["taux_caf"]) * 25))))
 s_ro = 25 if ro_ok else max(0, int(round(25 + (ro_solde / max(1.0, c_756)) * 60)))
 s_treso = min(25, max(0, int(round((j_treso / normes["jours_treso"]) * 22))))
@@ -815,7 +791,7 @@ with onglets[1]:
         elif health_score >= 45:
             st.warning(f"**Zone de vigilance ({health_score}/100) :** Des tensions apparaissent sur la CAF ({tcaf:.1f} %) ou la couverture immobilière ({ro_solde:+,.0f} €). Des ajustements budgétaires ciblés sont nécessaires dès l'EPRD prochain.".replace(",", " "))
         else:
-            st.error(f"**Alerte financière ({health_score}/100) :** Rupture d'autofinancement ou tension critique sur la trésorerie ({j_tr} jours) et la Règle d'Or ({ro_solde:+,.0f} €). Plan de redressement requis.".replace(",", " "))
+            st.error(f"**Alerte financière ({health_score}/100) :** Rupture d'autofinancement ou tension critique sur la trésorerie ({j_treso} jours) et la Règle d'Or ({ro_solde:+,.0f} €). Plan de redressement requis.".replace(",", " "))
 
     c_sig1, c_sig2 = st.columns([1.4, 1])
     with c_sig1:
@@ -871,7 +847,6 @@ with onglets[1]:
 with onglets[2]:
     st.subheader("Audit Analytique au Scalpel : Les 5 Centres de Sensibilité")
 
-    # 1. RH Granulaire
     st.markdown("#### 1. Cartographie RH Interne (Décomposition du Compte 64)")
     crh1, crh2 = st.columns([1.4, 1])
     with crh1:
@@ -892,7 +867,6 @@ with onglets[2]:
 
     st.divider()
 
-    # 2. Bâtiment, Maintenance & Règle d'Or
     st.markdown("#### 2. Patrimoine, Maintenance (Cpte 615) & Énergie")
     cb1, cb2, cb3 = st.columns(3)
     cb1.metric("Maintenance & Réparations (615)", f"{maint_615:,.0f} €".replace(",", " "), f"{maint_m2:.1f} €/m² (Norme : {normes['maint_m2']} €/m²)", delta_color="inverse" if maint_m2 > normes["maint_m2"]*1.25 else "normal")
@@ -904,7 +878,6 @@ with onglets[2]:
 
     st.divider()
 
-    # 3. Restauration/Internat & 4. Effort Pédagogique
     cs1, cs2 = st.columns(2)
     with cs1:
         st.markdown("#### 3. Restauration & Internat (Services annexes)")
@@ -922,7 +895,6 @@ with onglets[2]:
         else:
             st.success("L'enveloppe pédagogique directe est préservée au niveau des standards nationaux.")
 
-    # 5. Pôle UFA / CFC
     if activer_ufa_cfc:
         st.divider()
         st.markdown("#### 5. Pôle Hors Contrat : Apprentissage (UFA) vs Formation Continue (CFC)")
@@ -961,7 +933,7 @@ with onglets[3]:
         taux_subv_ppi = st.slider("Subventions Région/AEP/MASA (%)", 0, 70, 30, 5)
     with sp4:
         st.markdown("**4. OPEX induits & Dette**")
-        opex_ppi_pct = st.slider("OPEX induits par le PPI (% du PPI)", -2.0, 5.0, 1.5, 0.5, help="Négatif si rénovation thermique générant des économies d'énergie.")
+        opex_ppi_pct = st.slider("OPEX induits par le PPI (% du PPI)", -2.0, 5.0, 1.5, 0.5)
         duree_emprunt = st.selectbox("Durée nouveaux emprunts", [15, 20, 25], index=1)
 
     ans_p = ["2026", "2027", "2028", "2029", "2030"]
@@ -998,14 +970,14 @@ with onglets[3]:
         c_dec_an = max(0.01, tot_c_opex - curr_amo)
         curr_j = (curr_treso / c_dec_an) * 365
 
-        p_list.append(curr_p)
-        c_list.append(tot_c_opex)
-        caf_list.append(curr_caf)
-        subv_list.append(subv_ppi_an)
-        det_list.append(curr_det)
-        des_list.append(curr_des)
-        tr_list.append(curr_treso)
-        jtr_list.append(curr_j)
+        p_list.append(round(curr_p, 2))
+        c_list.append(round(tot_c_opex, 2))
+        caf_list.append(round(curr_caf, 2))
+        subv_list.append(round(subv_ppi_an, 2))
+        det_list.append(round(curr_det, 2))
+        des_list.append(round(curr_des, 1))
+        tr_list.append(round(curr_treso, 2))
+        jtr_list.append(round(curr_j, 0))
 
     df_proj = pd.DataFrame({
         "Année": ans_p,
@@ -1033,11 +1005,7 @@ with onglets[3]:
         st.markdown("**Trajectoire CAF & Trésorerie disponible (M€)**")
         st.line_chart(df_proj.set_index("Année")[["CAF (M€)", "Trésorerie (M€)"]])
 
-    st.dataframe(df_proj.style.format({
-        "Produits (M€)": "{:.2f}", "Charges + OPEX (M€)": "{:.2f}", "CAF (M€)": "{:.2f}",
-        "Subv. PPI (M€)": "{:.2f}", "Dette 31/12 (M€)": "{:.2f}", "Désendettement (ans)": "{:.1f}",
-        "Trésorerie (M€)": "{:.2f}", "Trésorerie (jours)": "{:.0f} j"
-    }), hide_index=True, use_container_width=True)
+    st.dataframe(df_proj, hide_index=True, use_container_width=True)
 
     feuille_route = [
         f"1. Solvabilité & Épargne : CAF cible de {caf_list[-1]:.2f} M€ en 2030 ({(caf_list[-1]/p_list[-1]*100):.1f} % des produits) et désendettement à {des_list[-1]:.1f} ans.",
