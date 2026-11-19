@@ -34,7 +34,7 @@ def get_normes_etablissement(type_etab):
             "poids_admin": 24.0,
             "b_peda": 70,
             "maint_m2": 15.0,
-            "amort_m2": 28.0,
+            "amort_m2": 18.0,
             "fluides_eleve": 145,
             "tx_internat": 0,
             "desend_moy": 5.2,
@@ -54,7 +54,7 @@ def get_normes_etablissement(type_etab):
             "poids_admin": 26.0,
             "b_peda": 100,
             "maint_m2": 18.0,
-            "amort_m2": 32.0,
+            "amort_m2": 30.0,
             "fluides_eleve": 165,
             "tx_internat": 5,
             "desend_moy": 5.5,
@@ -134,7 +134,7 @@ def get_normes_etablissement(type_etab):
             "poids_admin": 26.0,
             "b_peda": 110,
             "maint_m2": 20.0,
-            "amort_m2": 34.0,
+            "amort_m2": 32.0,
             "fluides_eleve": 175,
             "tx_internat": 15,
             "desend_moy": 5.6,
@@ -267,20 +267,20 @@ def _header_pdf(ax, titre_doc, sous_titre):
     ax.add_patch(Rectangle((0, 0.915), 1, 0.085, facecolor="#0f172a", transform=ax.transAxes))
     ax.add_patch(Rectangle((0, 0.911), 1, 0.004, facecolor="#d97706", transform=ax.transAxes))
     ax.text(0.04, 0.962, titre_doc, color="white", fontsize=10.2, fontweight="bold", transform=ax.transAxes)
-    ax.text(0.04, 0.930, sous_titre, color="#cbd5e1", fontsize=7.6, transform=ax.transAxes)
+    ax.text(0.04, 0.930, sous_titre, color="#cbd5e1", fontsize=7.4, transform=ax.transAxes)
 
 def _footer_pdf(ax, gauche, page_txt):
     ax.plot([0.04, 0.96], [0.038, 0.038], color="#cbd5e1", lw=0.8, transform=ax.transAxes)
     ax.text(0.04, 0.020, gauche, fontsize=7.0, color="#64748b", transform=ax.transAxes)
     ax.text(0.96, 0.020, page_txt, ha="right", fontsize=7.0, fontweight="bold", color="#475569", transform=ax.transAxes)
 
-def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, amo_r, det_r, tcma_p, tcma_c, tcma_ms, gvt_pt, conv_pt, vol_pt, atouts_txt, vig_txt):
+def build_pdf_retro(etab, normes, statut_immo, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, amo_r, det_r, tcma_p, tcma_c, tcma_ms, gvt_pt, conv_pt, vol_pt, atouts_txt, vig_txt):
     buf = io.BytesIO()
     with PdfPages(buf) as pdf:
         fig = plt.figure(figsize=(8.27, 11.69), dpi=150)
         ax = fig.add_axes([0, 0, 1, 1])
         ax.axis("off")
-        _header_pdf(ax, "ARCHÉTYPE ÉDUCATION  |  DOSSIER D'AUDIT RÉTROSPECTIF ANC 2018-06 (2021-2025)", f"ÉTABLISSEMENT : {etab.upper()}  •  {normes['type_court'].upper()}  •  TRAJECTOIRE & PATRIMOINE")
+        _header_pdf(ax, "ARCHÉTYPE ÉDUCATION  |  DOSSIER D'AUDIT RÉTROSPECTIF ANC 2018-06 (2021-2025)", f"ÉTABLISSEMENT : {etab.upper()}  •  {normes['type_court'].upper()}  •  STATUT : {statut_immo.upper()}")
 
         ciseau = tcma_c - tcma_p
         var_caf = caf_r[-1] - caf_r[0]
@@ -289,7 +289,7 @@ def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, am
             ("TCMA PRODUITS", f"+{tcma_p:.2f} % / an", "Rythme annuel recettes", "#059669"),
             ("TCMA CHARGES", f"+{tcma_c:.2f} % / an", f"Effet ciseau : {ciseau:+.2f} pts", "#dc2626" if ciseau > 0.3 else "#d97706"),
             ("ÉVOLUTION CAF", f"{caf_r[-1]:.2f} M€", f"Variation : {var_caf:+.2f} M€ (Cible {normes['taux_caf']}%)", "#059669" if var_caf >= 0 else "#dc2626"),
-            ("RENOUVELLEMENT", f"{tx_renouv:.0f} %", "Inv. cumulés / Amort. (Norme >= 100%)", "#059669" if tx_renouv >= 90 else "#d97706"),
+            ("RENOUVELLEMENT", f"{tx_renouv:.0f} %", "Inv. cumulés / Amort. (Cible >= 100%)", "#059669" if tx_renouv >= 90 else "#d97706"),
         ]
         for i, (kt, kv, ks, kc) in enumerate(kpis):
             kx = 0.04 + i * 0.233
@@ -326,14 +326,14 @@ def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, am
         g3.legend(fontsize=6.5, loc="upper left")
 
         _box(ax, 0.51, 0.375, 0.45, 0.155, fc="#f8fafc")
-        ax.text(0.525, 0.508, "DIAGNOSTIC PATRIMONIAL & ENDETTEMENT", fontsize=7.8, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+        ax.text(0.525, 0.508, "DIAGNOSTIC PATRIMONIAL & STATUT IMMOBILIER", fontsize=7.6, fontweight="bold", color="#0f172a", transform=ax.transAxes)
         moy_inv = np.mean(inv_r)
         diag_eq = [
             f"• Investissement moyen : {moy_inv:.2f} M€/an vs {np.mean(amo_r):.2f} M€/an d'amortissements (renouvellement : {tx_renouv:.0f} %).",
-            f"• Encours de dette : passe de {det_r[0]:.2f} M€ à {det_r[-1]:.2f} M€ ({(det_r[-1]-det_r[0]):+.2f} M€ sur la période).",
-            "• Enjeu : Si renouvellement < 100 %, le parc vieillit et génère une hausse future de la maintenance (Cpte 615)."
+            f"• Encours de dette OGEC : passe de {det_r[0]:.2f} M€ à {det_r[-1]:.2f} M€ ({(det_r[-1]-det_r[0]):+.2f} M€).",
+            f"• Relativisation ({statut_immo}) : {'en tant que locataire AEP, les gros murs sont amortis par le propriétaire.' if 'Locataire' in statut_immo else 'l OGEC porte directement l amortissement et le renouvellement du bâti.'}"
         ]
-        _draw_lines(ax, 0.525, 0.480, diag_eq, wrap_w=56, step_y=0.017, gap_item=0.005, fontsize=6.9)
+        _draw_lines(ax, 0.525, 0.480, diag_eq, wrap_w=56, step_y=0.017, gap_item=0.005, fontsize=6.8)
 
         ax.text(0.04, 0.335, "TABLEAU RÉTROSPECTIF DES SOLDES, INVESTISSEMENTS & DETTE (2021-2025)", fontsize=8.1, fontweight="bold", color="#0f172a", transform=ax.transAxes)
         tax = fig.add_axes([0.04, 0.140, 0.92, 0.180])
@@ -363,7 +363,7 @@ def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, am
         ax.text(0.055, 0.108, "SYNTHÈSE DE LA TRAJECTOIRE PASSÉE", fontsize=7.6, fontweight="bold", color="#92400e", transform=ax.transAxes)
         cis_lines = [
             f"• Effet ciseau ({ciseau:+.2f} pts/an) : les dépenses (+{tcma_c:.2f} %/an) progressent {'plus vite' if ciseau > 0 else 'moins vite'} que les recettes (+{tcma_p:.2f} %/an).",
-            f"• Effort de renouvellement à {tx_renouv:.0f} % des amortissements : {'maintien de la valeur du patrimoine.' if tx_renouv >= 95 else 'sous-investissement relatif à surveiller.'}"
+            f"• Effort de renouvellement à {tx_renouv:.0f} % des amortissements : {'maintien de la valeur des équipements.' if tx_renouv >= 95 else 'sous-investissement relatif à surveiller au regard du statut ' + statut_immo + '.'}"
         ]
         _draw_lines(ax, 0.055, 0.088, cis_lines, wrap_w=124, step_y=0.016, gap_item=0.004, fontsize=6.9)
         _footer_pdf(ax, "Dossier Rétrospectif ANC 2018-06  •  Cabinet QUINZE", "Page 1/2")
@@ -408,12 +408,12 @@ def build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, am
         plt.close(fig2)
     return buf.getvalue()
 
-def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ch_ufa_cfc, ebe, fin_val, amo_val, rn, caf, remb, aut, dette, cap_d, treso, j_treso, ro_solde, maint_m2, amo_m2, b_peda, m_ufa, m_cfc, synthese_tbi):
+def build_pdf_tbi(etab, normes, statut_immo, norme_amort_eff, eleves, surf, score, tp, ach, ext_f, va, ms, ch_ufa_cfc, ebe, fin_val, amo_val, rn, caf, remb, aut, dette, cap_d, treso, j_treso, ro_solde, maint_m2, amo_m2, eq_loyer_m2, b_peda, ben_app, ben_stag, synthese_tbi):
     buf = io.BytesIO()
     fig = plt.figure(figsize=(8.27, 11.69), dpi=150)
     ax = fig.add_axes([0, 0, 1, 1])
     ax.axis("off")
-    _header_pdf(ax, "ARCHÉTYPE ÉDUCATION  |  PLATEFORME D'ARBITRAGE ANC 2018-06 & NORMES", f"ÉTABLISSEMENT : {etab.upper()} ({eleves} ÉLÈVES  •  {surf} M²  •  {normes['strate'].upper()})")
+    _header_pdf(ax, "ARCHÉTYPE ÉDUCATION  |  PLATEFORME D'ARBITRAGE ANC 2018-06 & NORMES", f"ÉTABLISSEMENT : {etab.upper()} ({eleves} ÉLÈVES • {surf} M² • {statut_immo.upper()})")
 
     sc_col = "#059669" if score >= 70 else ("#d97706" if score >= 45 else "#dc2626")
     sc_bg = "#ecfdf5" if score >= 70 else ("#fffbeb" if score >= 45 else "#fef2f2")
@@ -427,7 +427,7 @@ def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ch_
     tcaf = (caf / tp * 100) if tp > 0 else 0
     tebe = (ebe / tp * 100) if tp > 0 else 0
     ax.text(0.275, 0.850, f"EBE : {tebe:.1f}% (Moy. {normes['taux_ebe']}%) • CAF : {tcaf:.1f}% (Cible {normes['taux_caf']}%) • Désendettement : {cap_d:.1f} ans (Moy. {normes['desend_moy']} a.)", fontsize=6.8, color="#1e293b", transform=ax.transAxes)
-    ax.text(0.275, 0.827, f"Règle d'Or : {ro_solde:+.2f} M€ (Norme >= 0) • Trésorerie : {j_treso} j (Cible {normes['jours_treso']} j) • Amort. : {amo_m2:.1f} €/m²", fontsize=6.8, color="#1e293b", transform=ax.transAxes)
+    ax.text(0.275, 0.827, f"Règle d'Or : {ro_solde:+.2f} M€ (Norme >= 0) • Charge Immo Globale : {eq_loyer_m2:.1f} €/m² • Tréso : {j_treso} j", fontsize=6.8, color="#1e293b", transform=ax.transAxes)
 
     _box(ax, 0.04, 0.450, 0.50, 0.350, fc="#ffffff")
     ax.add_patch(Rectangle((0.04, 0.762), 0.50, 0.038, facecolor="#1e293b", transform=ax.transAxes))
@@ -440,7 +440,7 @@ def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ch_
         ("= EBE (Excédent Brut)", f"{ebe:.2f} M€ ({tebe:.1f}%)", f"Moy. {normes['taux_ebe']}%", True, "#059669" if tebe >= normes['taux_ebe'] else "#dc2626"),
         ("- Frais financiers / Intérêts (66)", f"-{fin_val:.2f} M€", "< 2,5%", False, "#475569"),
         ("= CAPACITÉ D'AUTOFINANCEMENT", f"{caf:.2f} M€ ({tcaf:.1f}%)", f"Cible {normes['taux_caf']}%", True, "#b45309"),
-        ("- Dotations Amortissements (681)", f"-{amo_val:.2f} M€", "8 - 12%", False, "#475569"),
+        ("- Dotations Amortissements (681)", f"-{amo_val:.2f} M€", f"{norme_amort_eff:.0f} €/m²", False, "#475569"),
         ("= Résultat Net Comptable (RCAI)", f"{rn:+.2f} M€", "Norme >= 0", True, "#059669" if rn >= 0 else "#dc2626"),
         ("- Remb. Capital Dette (164)", f"-{remb:.2f} M€", "-", False, "#475569"),
         ("= Autofinancement Net", f"{aut:+.2f} M€", "Norme >= 0", True, "#059669" if aut >= 0 else "#dc2626"),
@@ -456,17 +456,17 @@ def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ch_
 
     _box(ax, 0.56, 0.635, 0.40, 0.165, fc="#ffffff")
     ax.add_patch(Rectangle((0.56, 0.762), 0.40, 0.038, facecolor="#1e293b", transform=ax.transAxes))
-    ax.text(0.575, 0.775, "2. PATRIMOINE & RATIOS MÉTIERS", color="white", fontsize=7.9, fontweight="bold", transform=ax.transAxes)
+    ax.text(0.575, 0.775, "2. PATRIMOINE & HORS CONTRAT", color="white", fontsize=7.9, fontweight="bold", transform=ax.transAxes)
     sc_items = [
-        ("Amortissements (681) :", f"{amo_m2:.1f} €/m² (Moy. {normes['amort_m2']} €)"),
+        ("Amort. (681) / Éq. Loyer :", f"{amo_m2:.1f} / {eq_loyer_m2:.1f} €/m²"),
         ("Maintenance (615) :", f"{maint_m2:.1f} €/m² (Moy. {normes['maint_m2']} €)"),
-        ("Budget Pédago. :", f"{b_peda:.0f} €/él. (Moy. {normes['b_peda']} €)"),
-        ("Marge UFA / CFC :", f"{m_ufa:+.2f} / {m_cfc:+.2f} M€"),
+        ("Bénéfice net / Apprenti :", f"{ben_app:+.0f} € (Cible +600 à +1000 €)"),
+        ("Bénéfice net / Stagiaire FC :", f"{ben_stag:+.0f} € (Cible +100 à +250 €)"),
     ]
     ysc = 0.732
     for k, v in sc_items:
-        ax.text(0.572, ysc, k, fontsize=6.8, color="#475569", transform=ax.transAxes)
-        ax.text(0.948, ysc, v, ha="right", fontsize=6.9, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+        ax.text(0.572, ysc, k, fontsize=6.7, color="#475569", transform=ax.transAxes)
+        ax.text(0.948, ysc, v, ha="right", fontsize=6.8, fontweight="bold", color="#0f172a", transform=ax.transAxes)
         ysc -= 0.028
 
     _box(ax, 0.56, 0.450, 0.40, 0.170, fc="#ffffff")
@@ -474,46 +474,46 @@ def build_pdf_tbi(etab, normes, eleves, surf, score, tp, ach, ext_f, va, ms, ch_
     ax.text(0.575, 0.595, "3. DETTE, ANNUITÉ & TRÉSORERIE", color="white", fontsize=7.9, fontweight="bold", transform=ax.transAxes)
     abs_caf = ((remb + fin_val) / max(0.01, caf)) * 100
     det_items = [
-        ("Encours Dette :", f"{dette:.2f} M€ ({cap_d:.1f} ans)"),
+        ("Encours Dette OGEC :", f"{dette:.2f} M€ ({cap_d:.1f} ans)"),
         ("Absorption CAF par dette :", f"{abs_caf:.0f} % (Max 75 %)"),
         ("Règle d'Or Immo :", f"{ro_solde:+.2f} M€ (Norme >= 0)"),
         ("Trésorerie :", f"{j_treso} j (Cible {normes['jours_treso']} j)"),
     ]
     yd = 0.552
     for k, v in det_items:
-        ax.text(0.572, yd, k, fontsize=6.8, color="#475569", transform=ax.transAxes)
-        ax.text(0.948, yd, v, ha="right", fontsize=6.9, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+        ax.text(0.572, yd, k, fontsize=6.7, color="#475569", transform=ax.transAxes)
+        ax.text(0.948, yd, v, ha="right", fontsize=6.8, fontweight="bold", color="#0f172a", transform=ax.transAxes)
         yd -= 0.028
 
     _box(ax, 0.04, 0.275, 0.92, 0.160, fc="#f8fafc", ec="#94a3b8")
     ax.text(0.055, 0.415, "4. SYNTHÈSE EXÉCUTIVE & CLÉS D'AJUSTEMENT DU BUDGET PRÉVISIONNEL", fontsize=8.0, fontweight="bold", color="#0f172a", transform=ax.transAxes)
     _draw_lines(ax, 0.055, 0.390, synthese_tbi, wrap_w=124, step_y=0.017, gap_item=0.005, fontsize=7.0)
 
-    ax.text(0.04, 0.248, f"REPÈRES PÉDAGOGIQUES & NORMES DU PROFIL ({normes['strate'].upper()})", fontsize=7.6, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+    ax.text(0.04, 0.248, f"REPÈRES RELATIVISÉS ({normes['type_court'].upper()} — {statut_immo.upper()})", fontsize=7.5, fontweight="bold", color="#0f172a", transform=ax.transAxes)
     refs = [
-        ("EBE -> CAF", "Passage opérationnel à épargne", [f"EBE moy. : {normes['taux_ebe']} %", f"CAF cible : >= {normes['taux_caf']} %", "Écart = Intérêts dette (66)"]),
-        ("AMORT. & RENOUV.", "Usure & maintien du patrimoine", [f"Amort. moy. : {normes['amort_m2']} €/m²", f"Maint. moy. : {normes['maint_m2']} €/m²", "Inv. >= Amort. sur 5 ans"]),
-        ("DETTE & ANNUITÉ", "Poids des emprunts sur la CAF", [f"Désend. moy. : {normes['desend_moy']} ans", f"Seuil alerte : > {normes['desend_max']} ans", "Annuité < 75 % de la CAF"]),
-        ("RÈGLE D'OR & TRÉSO", "Étanchéité & sécurité", ["756 >= Amort + Int + Loyers", f"Tréso cible : {normes['jours_treso']} j", "Forfait public = scolaire"]),
+        ("PROPRIÉTAIRE VS LOCATAIRE", "Lecture des amortissements", [f"Norme ajustée : ~{norme_amort_eff:.0f} €/m²", "Prop. = amortit les murs", "Loc. = paie un loyer AEP (613)"]),
+        ("ÉQUIVALENT LOYER", "Charge immo globale / m²", ["Amort. 681 + Loyers 613 + Int.", f"Repère profil : ~{normes['amort_m2']:.0f} €/m²", "Compare prop. et locataires"]),
+        ("HORS CONTRAT", "UFA & Formation Continue", ["Bénéfice net > 0 obligatoire", "UFA : +600 à +1 000 €/app.", "CFC : +100 à +250 €/stag."]),
+        ("RÈGLE D'OR & DETTE", "Étanchéité & solvabilité", ["756 >= Amort + Int + Loyers", f"Désend. : < {normes['desend_max']} ans", f"Tréso : {normes['jours_treso']} j"]),
     ]
     for i, (rt, rf, rbullets) in enumerate(refs):
         rx = 0.04 + i * 0.233
         _box(ax, rx, 0.055, 0.218, 0.180, fc="#ffffff")
-        ax.text(rx + 0.012, 0.215, rt, fontsize=7.1, fontweight="bold", color="#0f172a", transform=ax.transAxes)
-        ax.text(rx + 0.012, 0.193, rf, fontsize=6.3, color="#64748b", transform=ax.transAxes)
-        _draw_lines(ax, rx + 0.012, 0.160, [f"• {b}" for b in rbullets], wrap_w=32, step_y=0.024, gap_item=0.004, fontsize=6.7)
+        ax.text(rx + 0.012, 0.215, rt, fontsize=6.9, fontweight="bold", color="#0f172a", transform=ax.transAxes)
+        ax.text(rx + 0.012, 0.193, rf, fontsize=6.2, color="#64748b", transform=ax.transAxes)
+        _draw_lines(ax, rx + 0.012, 0.160, [f"• {b}" for b in rbullets], wrap_w=32, step_y=0.024, gap_item=0.004, fontsize=6.6)
 
     _footer_pdf(ax, "Rapport certifié conforme aux règles ANC 2018-06  •  Cabinet QUINZE", "Page 1/1")
     fig.savefig(buf, format="pdf")
     plt.close(fig)
     return buf.getvalue()
 
-def build_pdf_prospective(etab, normes, ppi_annuel, exec_pct, df_proj, feuille_route):
+def build_pdf_prospective(etab, normes, statut_immo, ppi_annuel, exec_pct, df_proj, feuille_route):
     buf = io.BytesIO()
     fig = plt.figure(figsize=(8.27, 11.69), dpi=150)
     ax = fig.add_axes([0, 0, 1, 1])
     ax.axis("off")
-    _header_pdf(ax, "ARCHÉTYPE ÉDUCATION  |  TRAJECTOIRE PROSPECTIVE & PROJET À 5 ANS (2026-2030)", f"ÉTABLISSEMENT : {etab.upper()}  •  SCÉNARIO : CIBLE OPTIMISÉE  •  PPI : {ppi_annuel:.2f} M€/AN (EXÉC. {exec_pct:.0f}%)")
+    _header_pdf(ax, "ARCHÉTYPE ÉDUCATION  |  TRAJECTOIRE PROSPECTIVE & PROJET À 5 ANS (2026-2030)", f"ÉTABLISSEMENT : {etab.upper()}  •  {statut_immo.upper()}  •  PPI : {ppi_annuel:.2f} M€/AN (EXÉC. {exec_pct:.0f}%)")
 
     caf_30 = df_proj["CAF (M€)"].iloc[-1]
     tcaf_30 = (caf_30 / df_proj["Produits (M€)"].iloc[-1] * 100)
@@ -601,9 +601,25 @@ type_etab = st.sidebar.selectbox(
         "MFR / Alternance (Art. L. 813-9 MASA)"
     ]
 )
+statut_immo = st.sidebar.selectbox(
+    "Statut immobilier de l'OGEC",
+    [
+        "Mixte (Propriétaire partiel + Loyers AEP)",
+        "Propriétaire des murs (Pleine propriété)",
+        "Locataire (Murs portés par AEP / Diocèse)"
+    ]
+)
 is_agricole = ("Agricole" in type_etab) or ("MFR" in type_etab)
 normes = get_normes_etablissement(type_etab)
 etab = st.sidebar.text_input("Nom de l'établissement", "Lycée Polyvalent Saint-Éloi")
+
+# Ajustement de la norme d'amortissement au m² selon le statut immobilier
+if "Propriétaire" in statut_immo:
+    norme_amort_eff = normes["amort_m2"]
+elif "Locataire" in statut_immo:
+    norme_amort_eff = 10.0
+else:
+    norme_amort_eff = round(normes["amort_m2"] * 0.75, 1)
 
 c_sb1, c_sb2 = st.sidebar.columns(2)
 eleves_tot = c_sb1.number_input("Élèves (initial)", min_value=1, value=650, step=10)
@@ -637,14 +653,27 @@ else:
     d_autp = 45000.0
     prod_scol_base = d_f74 + d_c756 + d_a70 + d_autp
     d_ach = float(eleves_tot * normes["b_peda"] + internes_tot * 290)
-    d_loy = 65000.0
+    if "Propriétaire" in statut_immo:
+        d_loy = 0.0
+        d_amo = float(round(surface_m2 * normes["amort_m2"]))
+        d_det = 1150000.0
+        d_remb = 110000.0
+        d_fin = 42000.0
+    elif "Locataire" in statut_immo:
+        d_loy = float(round(surface_m2 * max(8.0, normes["amort_m2"] - 8.0)))
+        d_amo = float(round(surface_m2 * 10.0))
+        d_det = 180000.0
+        d_remb = 25000.0
+        d_fin = 8000.0
+    else:
+        d_loy = 65000.0
+        d_amo = float(round(surface_m2 * norme_amort_eff))
+        d_det = 880000.0
+        d_remb = 85000.0
+        d_fin = 38000.0
     d_maint = float(round(surface_m2 * normes["maint_m2"]))
     d_ext = float(round(eleves_tot * normes["fluides_eleve"] / 0.55))
     d_ms = float(round(prod_scol_base * (normes["poids_ms"] / 100.0)))
-    d_amo = float(round(surface_m2 * normes["amort_m2"]))
-    d_fin = 38000.0
-    d_det = 880000.0
-    d_remb = 85000.0
     d_tres = 420000.0
 
 st.sidebar.markdown("### 2. Recettes & Pôle Hors Contrat")
@@ -654,15 +683,15 @@ a_70 = st.sidebar.number_input("Restauration, internat & annexes (70) (€)", va
 aut_p = st.sidebar.number_input("Autres produits (75/78/79) (€)", value=float(d_autp), step=5000.0)
 
 activer_ufa_cfc = st.sidebar.checkbox("Intégrer un pôle Apprentissage (UFA) & CFC", value=(True if "Lycée" in type_etab or is_agricole else False))
-prod_ufa, ch_ufa, prod_cfc, ch_cfc, app_tot, stag_tot = 0.0, 0.0, 0.0, 0.0, 0, 0
+prod_ufa, ch_ufa, prod_cfc, ch_cfc, app_tot, stag_tot = 0.0, 0.0, 0.0, 0.0, 1, 1
 if activer_ufa_cfc:
     with st.sidebar.expander("🎓 Détail UFA (Apprentissage) & CFC", expanded=True):
-        app_tot = st.number_input("Effectif apprentis (UFA)", value=110, step=5)
+        app_tot = st.number_input("Effectif apprentis (UFA)", min_value=1, value=110, step=5)
         prod_ufa = st.number_input("Produits UFA (NPEC OPCO, TA) (€)", value=740000.0, step=10000.0)
-        ch_ufa = st.number_input("Charges UFA (Formateurs, redevance CFA) (€)", value=610000.0, step=10000.0)
-        stag_tot = st.number_input("Stagiaires Formation Continue (CFC)", value=75, step=5)
+        ch_ufa = st.number_input("Charges UFA (Formateurs, redevance CFA) (€)", value=645000.0, step=10000.0)
+        stag_tot = st.number_input("Stagiaires Formation Continue (CFC)", min_value=1, value=75, step=5)
         prod_cfc = st.number_input("Produits CFC (Entreprises, CPF, Région) (€)", value=115000.0, step=5000.0)
-        ch_cfc = st.number_input("Charges CFC (Vacataires, com., matériel) (€)", value=132000.0, step=5000.0)
+        ch_cfc = st.number_input("Charges CFC (Vacataires, com., matériel) (€)", value=103000.0, step=5000.0)
 
 with st.sidebar.expander("👥 3. Granularité RH (Masse Salariale 64)", expanded=True):
     st.caption("Salaires + charges patronales (hors enseignants payés par l'État).")
@@ -722,11 +751,15 @@ taux_abs_caf = (annuite_dette / caf * 100) if caf > 0 else 100.0
 ro_solde = c_756 - (amort_68 + fin_66 + loyers_613)
 ro_ok = ro_solde >= 0
 
-# Ratios unitaires & patrimoniaux vs Moyennes Strate
+# Ratios unitaires & patrimoniaux relativisés Propriétaire / Locataire
 forfait_eleve_reel = f_74 / max(1, eleves_tot)
 contrib_eleve_reel = c_756 / max(1, eleves_tot)
 maint_m2 = maint_615 / max(1, surface_m2)
 amort_m2 = amort_68 / max(1, surface_m2)
+loyer_m2 = loyers_613 / max(1, surface_m2)
+eq_loyer_m2 = (amort_68 + loyers_613 + fin_66) / max(1, surface_m2)
+norme_eq_loyer = normes["amort_m2"] + 4.0
+
 effort_immo_tot = maint_615 + amort_68 + loyers_613
 poids_immo_tp = (effort_immo_tot / tp_scol * 100) if tp_scol > 0 else 0.0
 fluides_eleve = fluides_606 / max(1, eleves_tot)
@@ -740,8 +773,11 @@ ch_resto_directes = ach_resto + (ms_tech * 0.45) + (fluides_606 * 0.25)
 marge_resto = a_70 - ch_resto_directes
 tx_couv_resto = (a_70 / ch_resto_directes * 100) if ch_resto_directes > 0 else 100.0
 
+# Pôle Hors Contrat (UFA et Formation Continue)
 marge_ufa = prod_ufa - ch_ufa
 marge_cfc = prod_cfc - ch_cfc
+ben_par_apprenti = (marge_ufa / max(1, app_tot)) if activer_ufa_cfc else 0.0
+ben_par_stagiaire = (marge_cfc / max(1, stag_tot)) if activer_ufa_cfc else 0.0
 
 s_caf = min(30, max(0, int(round((tcaf / normes["taux_caf"]) * 25))))
 s_ro = 25 if ro_ok else max(0, int(round(25 + (ro_solde / max(1.0, c_756)) * 60)))
@@ -754,25 +790,25 @@ health_score = min(100, s_caf + s_ro + s_treso + s_det)
 # ==========================================
 st.title("Archétype Éducation — Audit ANC 2018-06, Pilotage & Prospective")
 badge_src = "Balances ANC 2018-06 certifiées" if source_reelle else "Modèle calibré Observatoire"
-st.caption(f"Établissement : **{etab}** • {normes['type_court']} • {eleves_tot} élèves • {surface_m2} m² • {badge_src}")
+st.caption(f"Établissement : **{etab}** • {normes['type_court']} • **{statut_immo}** • {eleves_tot} élèves • {surface_m2} m² • {badge_src}")
 
-with st.expander("📖 Guide pédagogique : comprendre les chiffres, l'investissement et les ratios (Spécial CA & Président d'OGEC)", expanded=False):
-    st.markdown("Ce guide traduit les termes comptables (norme associative **ANC 2018-06**) en repères concrets de gestion pour éclairer les décisions du Conseil d'Administration :")
+with st.expander("📖 Guide pédagogique : relativiser les normes selon le statut immobilier & comprendre les ratios (Spécial CA & Président d'OGEC)", expanded=False):
+    st.markdown("Ce guide traduit les termes comptables (norme associative **ANC 2018-06**) et précise comment lire les moyennes selon que l'OGEC est **propriétaire** ou **locataire** de ses murs :")
     gp_c1, gp_c2, gp_c3 = st.columns(3)
     with gp_c1:
-        st.markdown("**1. La Règle d'Or & les Amortissements**")
-        st.markdown("""* **La Règle d'Or :** la loi interdit d'utiliser les forfaits publics (commune, département, région) pour financer l'immobilier. Les *contributions des familles* (compte 756) doivent couvrir à elles seules les *amortissements*, les *intérêts d'emprunts* et les *loyers AEP*.
-* **Dotations aux amortissements (681) :** ce n'est pas une sortie d'argent immédiate, mais la constatation comptable de l'usure annuelle des bâtiments. **Repère clé :** si vos investissements annuels sont inférieurs à vos amortissements sur plusieurs années, le patrimoine vieillit et les frais de réparation (compte 615) finissent par exploser.""")
+        st.markdown("**1. Propriétaire vs Locataire : Relativiser les normes**")
+        st.markdown("""* **Pourquoi les amortissements (681) varient :** un OGEC **propriétaire** amortit les bâtiments (repère : **18 €/m²** en école primaire où les murs sont souvent anciens, **30 à 40 €/m²** en collège/lycée/agricole). À l'inverse, un OGEC **locataire** (murs portés par une AEP ou le diocèse) n'amortit que le mobilier et l'informatique (**8 à 12 €/m²**), mais paie un **loyer (613)**.
+* **L'indicateur « Équivalent Loyer » :** pour comparer équitablement propriétaires et locataires, on additionne `(Amortissements 681 + Loyers 613 + Intérêts 66) / m²`.
+* **La Règle d'Or :** quelle que soit la structure juridique, les *contributions des familles* (756) doivent couvrir l'ensemble de cette charge immobilière sans ponctionner les forfaits publics.""")
     with gp_c2:
         st.markdown("**2. Cohérence EBE → CAF → Autofinancement Net**")
-        st.markdown("""* **EBE (Excédent Brut d'Exploitation) :** la marge dégagée par le fonctionnement quotidien avant impôts, amortissements et banques.
-* **CAF (Capacité d'Autofinancement) :** égale à l'`EBE - Frais financiers (intérêts)`. C'est le cash généré sur l'année. Si l'EBE est élevé mais la CAF faible, c'est que le poids de la dette (intérêts) absorbe la performance.
-* **Autofinancement Net :** `CAF - Remboursement du capital des emprunts`. C'est l'argent réellement disponible pour autofinancer le renouvellement courant sans réemprunter.""")
+        st.markdown("""* **EBE (Excédent Brut d'Exploitation) :** marge dégagée par l'activité courante avant banques et amortissements.
+* **CAF (Capacité d'Autofinancement) :** égale à l'`EBE - Frais financiers (intérêts)`. C'est la ressource interne dégagée sur l'année.
+* **Autofinancement Net :** `CAF - Remboursement du capital des emprunts`. C'est l'argent réellement disponible pour financer le renouvellement courant sans réemprunter.""")
     with gp_c3:
-        st.markdown("**3. Dette, Trésorerie & Spécificités (MFR, Agricole)**")
-        st.markdown("""* **Désendettement & Annuité :** `Dette / CAF` doit rester **< 8 ans** (moyenne ~5,5 ans). L'annuité totale (`Capital + Intérêts`) ne doit pas dépasser **75 % de la CAF**.
-* **Trésorerie :** cible de **75 à 90 jours** de charges décaissables pour absorber le creux d'été entre deux versements de forfaits.
-* **Spécificités :** en **MFR**, les formateurs sont salariés de l'association (masse salariale interne > 60 %) ; en **Lycée Agricole**, le poids de l'internat (~45 %) et des plateaux techniques augmente les charges immobilières et d'énergie.""")
+        st.markdown("**3. Pôle Hors Contrat (UFA & CFC) & Spécificités**")
+        st.markdown("""* **UFA & Formation Continue :** ces deux activités hors contrat doivent chacune dégager un **bénéfice net positif** (cibles indicatives : **+600 à +1 000 €/apprenti** et **+100 à +250 €/stagiaire FC**) pour renforcer la CAF globale sans jamais peser sur l'activité scolaire sous contrat.
+* **MFR & Lycées Agricoles :** en **MFR**, les formateurs sont payés par l'association (masse salariale interne > 60 %) ; en **Lycée Agricole**, le poids de l'internat (~45 %) et des plateaux techniques augmente les charges immobilières et d'énergie.""")
 
 onglets = st.tabs([
     "📊 1. Rétrospective (Trajectoire & Renouvellement)",
@@ -786,9 +822,9 @@ onglets = st.tabs([
 # ------------------------------------------
 with onglets[0]:
     st.subheader("D'où venons-nous ? Trajectoire d'exploitation, renouvellement et dette (2021-2025)")
-    afficher_aide_pedagogique_onglet("Lecture de la trajectoire passée", [
+    afficher_aide_pedagogique_onglet("Lecture de la trajectoire passée (relativisée au statut immobilier)", [
         ("Effet Ciseau (TCMA Charges vs Produits)", "Rythme annuel moyen d'évolution. Si les charges montent plus vite que les recettes, la CAF s'érode mécaniquement."),
-        ("Taux de renouvellement patrimonial (Investissements / Amortissements)", "Mesure si l'établissement réinvestit au moins autant que l'usure comptable de ses bâtiments (>= 100 %). En dessous, une dette grise (travaux différés) s'accumule."),
+        ("Taux de renouvellement (Investissements / Amortissements)", f"Statut actuel : **{statut_immo}**. Un ratio < 100 % sur 5 ans signifie que les nouveaux équipements ne compensent pas l'usure comptable. Si l'OGEC est locataire, cela ne concerne que les équipements mobiliers et aménagements intérieurs (le gros œuvre relevant de l'AEP propriétaire)."),
         ("Effet Volume RH", "Part de la hausse des salaires liée aux décisions locales (créations de postes, remplacements) par opposition aux hausses subies (ancienneté GVT et point d'indice/EEPNL).")
     ])
 
@@ -824,8 +860,8 @@ with onglets[0]:
     kr1, kr2, kr3, kr4 = st.columns(4)
     kr1.metric("TCMA Produits", f"+{tcma_p:.2f} % / an", "Rythme des ressources")
     kr2.metric("TCMA Charges", f"+{tcma_c:.2f} % / an", f"Effet ciseau : {ciseau:+.2f} pts (Cible <= 0)", delta_color="inverse" if ciseau > 0 else "normal")
-    kr3.metric("Taux Renouvellement Bâti", f"{tx_renouv_hist:.0f} %", "Inv. cumulés / Amort. (Norme >= 100 %)", delta_color="normal" if tx_renouv_hist >= 95 else "inverse")
-    kr4.metric("Trajectoire Dette (5 ans)", f"{det_r[-1]:.2f} M€", f"Variation : {(det_r[-1]-det_r[0]):+.2f} M€")
+    kr3.metric("Taux Renouvellement", f"{tx_renouv_hist:.0f} %", "Inv. / Amort. (Cible >= 100 %)", delta_color="normal" if tx_renouv_hist >= 95 else "inverse")
+    kr4.metric("Trajectoire Dette OGEC", f"{det_r[-1]:.2f} M€", f"Variation 5 ans : {(det_r[-1]-det_r[0]):+.2f} M€")
 
     cg1, cg2, cg3 = st.columns(3)
     with cg1:
@@ -855,24 +891,29 @@ with onglets[0]:
     })
     st.dataframe(df_retro_tbl, hide_index=True, use_container_width=True)
 
+    relativisation_immo = (
+        "L'OGEC étant locataire, ses amortissements ne portent que sur le mobilier et les agencements ; le renouvellement du gros œuvre relève de l'AEP propriétaire."
+        if "Locataire" in statut_immo else
+        f"En statut {statut_immo.lower()}, un renouvellement inférieur à 100 % des amortissements signale un vieillissement du parc à anticiper."
+    )
     atouts_list = [
         f"Base de recettes solide ({tp/1e6:.2f} M€) et désendettement progressif ({(det_r[-1]-det_r[0]):+.2f} M€ sur la période).",
         f"Taux de CAF à {tcaf:.1f} % ({'conforme' if tcaf >= normes['taux_caf'] else 'inférieur'} au repère de {normes['taux_caf']} %).",
-        "Capacité d'autofinancement nette positive permettant de financer le renouvellement courant."
+        "Autofinancement net positif permettant de soutenir le renouvellement courant."
     ]
     vig_list = [
         f"Effet ciseau de {ciseau:+.2f} pts/an à résorber sur le prochain Budget Prévisionnel.",
-        f"Taux de renouvellement patrimonial de {tx_renouv_hist:.0f} % ({'satisfaisant' if tx_renouv_hist >= 95 else 'inférieur aux amortissements : attention au vieillissement des locaux'}).",
+        f"Taux de renouvellement à {tx_renouv_hist:.0f} % : {relativisation_immo}",
         f"Maintenir l'effet volume RH ({vol_pt:+.2f} pts/an) sous la norme de +0,30 pt/an."
     ]
-    pdf_retro_bytes = build_pdf_retro(etab, normes, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, amo_r, det_r, tcma_p, tcma_c, tcma_ms, gvt_pt, conv_pt, vol_pt, atouts_list, vig_list)
+    pdf_retro_bytes = build_pdf_retro(etab, normes, statut_immo, ans_r, p_r, c_r, ms_r, caf_r, aut_r, inv_r, amo_r, det_r, tcma_p, tcma_c, tcma_ms, gvt_pt, conv_pt, vol_pt, atouts_list, vig_list)
     st.download_button("📑 Télécharger le Dossier Rétrospectif Complet (PDF 2 pages)", data=pdf_retro_bytes, file_name=f"Dossier_Retro_{etab.replace(' ','_')}.pdf", mime="application/pdf", type="primary")
 
     afficher_synthese_unique(
         "Rétrospective : Trajectoire d'exploitation & Renouvellement",
-        f"Sur la période, les charges évoluent de +{tcma_c:.2f} %/an contre +{tcma_p:.2f} %/an pour les produits (effet ciseau : {ciseau:+.2f} pts/an). Côté patrimoine, les investissements cumulés ({sum(inv_r):.2f} M€) représentent {tx_renouv_hist:.0f} % des dotations aux amortissements ({sum(amo_r):.2f} M€), tandis que l'encours de dette évolue de {det_r[0]:.2f} M€ à {det_r[-1]:.2f} M€.",
+        f"Sur la période, les charges évoluent de +{tcma_c:.2f} %/an contre +{tcma_p:.2f} %/an pour les produits (effet ciseau : {ciseau:+.2f} pts/an). Côté patrimoine ({statut_immo}), les investissements cumulés ({sum(inv_r):.2f} M€) représentent {tx_renouv_hist:.0f} % des dotations aux amortissements ({sum(amo_r):.2f} M€), tandis que l'encours de dette évolue de {det_r[0]:.2f} M€ à {det_r[-1]:.2f} M€.",
         f"Le désendettement engagé libère progressivement de la marge financière, et {(gvt_pt+conv_pt):.2f} pts/an de la dérive salariale relèvent de facteurs externes subis (GVT et revalorisations conventionnelles).",
-        f"{'Le sous-investissement relatif (< 100 % des amortissements) impose de programmer un rattrapage d entretien/rénovation au prochain Budget Prévisionnel pour éviter une dérive de la maintenance.' if tx_renouv_hist < 95 else 'Le rythme de renouvellement préserve la valeur du bâti.'} Contenir l'effet volume RH ({vol_pt:+.2f} pts/an) sous +0,30 pt/an."
+        f"{relativisation_immo} Contenir l'effet volume RH ({vol_pt:+.2f} pts/an) sous +0,30 pt/an dans le prochain Budget Prévisionnel."
     )
 
 # ------------------------------------------
@@ -880,10 +921,10 @@ with onglets[0]:
 # ------------------------------------------
 with onglets[1]:
     st.subheader("Où en est-on ? Situation à date, Cascade des SIG & Diagnostic Patrimonial")
-    afficher_aide_pedagogique_onglet("Lecture de la cohérence EBE -> CAF & Endettement", [
+    afficher_aide_pedagogique_onglet("Lecture de la cohérence EBE -> CAF & Relativisation Propriétaire / Locataire", [
         ("Passage EBE -> CAF", "La CAF est égale à l'EBE diminué des intérêts d'emprunts (compte 66). Si l'EBE est bon mais la CAF faible, c'est uniquement parce que les intérêts de la dette pèsent trop lourd."),
-        ("Taux d'absorption de la CAF par la dette", "(Remboursement capital + Intérêts) / CAF. Si l'annuité totale de dette dépasse 75 % de la CAF, l'établissement n'a plus de marge pour autofinancer ses travaux courants."),
-        ("Dotations aux amortissements (Compte 681)", "Mesure l'intensité de l'outil immobilier et pédagogique. Comparé à la maintenance (615), il indique si l'école est en phase de modernisation ou de vieillissement.")
+        ("Relativisation Amortissements (681) vs Loyers (613)", f"Pour un profil **{normes['type_court']}** en statut **{statut_immo}**, le repère d'amortissement est ajusté à **~{norme_amort_eff:.0f} €/m²** (contre {normes['amort_m2']:.0f} €/m² en pleine propriété). Pour comparer objectivement propriétaires et locataires, on utilise l'**Équivalent Loyer global** `(Amort. 681 + Loyers 613 + Intérêts 66) / m²`."),
+        ("Taux d'absorption de la CAF par la dette", "(Remboursement capital + Intérêts) / CAF. Si l'annuité totale de dette dépasse 75 % de la CAF, l'établissement n'a plus de marge pour autofinancer ses travaux courants.")
     ])
 
     hs1, hs2 = st.columns([1, 2.5])
@@ -912,7 +953,7 @@ with onglets[1]:
             {"Solde Intermédiaire de Gestion": "= EXCÉDENT BRUT D'EXPLOITATION (EBE)", "Montant (€)": f"{ebe:,.0f} €".replace(",", " "), "% Produits": f"{tebe:.1f} %", "Moyenne / Norme": f"Moy. {normes['taux_ebe']} %"},
             {"Solde Intermédiaire de Gestion": "- Frais financiers / Intérêts emprunts (66)", "Montant (€)": f"-{fin_66:,.0f} €".replace(",", " "), "% Produits": f"{poids_fin_tp:.1f} %", "Moyenne / Norme": "Norme < 2,5 %"},
             {"Solde Intermédiaire de Gestion": "= CAPACITÉ D'AUTOFINANCEMENT (CAF)", "Montant (€)": f"{caf:,.0f} €".replace(",", " "), "% Produits": f"{tcaf:.1f} %", "Moyenne / Norme": f"Cible >= {normes['taux_caf']} %"},
-            {"Solde Intermédiaire de Gestion": "- Dotations aux amortissements (681)", "Montant (€)": f"-{amort_68:,.0f} €".replace(",", " "), "% Produits": f"{amort_68/tp*100:.1f} %", "Moyenne / Norme": "8 - 12 %"},
+            {"Solde Intermédiaire de Gestion": "- Dotations aux amortissements (681)", "Montant (€)": f"-{amort_68:,.0f} €".replace(",", " "), "% Produits": f"{amort_68/tp*100:.1f} %", "Moyenne / Norme": f"~{norme_amort_eff:.0f} €/m² ({statut_immo.split()[0]})"},
             {"Solde Intermédiaire de Gestion": "= RÉSULTAT NET COMPTABLE (RCAI)", "Montant (€)": f"{rn:+,.0f} €".replace(",", " "), "% Produits": f"{rn/tp*100:+.1f} %", "Moyenne / Norme": "Norme >= 0 %"},
             {"Solde Intermédiaire de Gestion": "- Remboursement annuel capital dette (164)", "Montant (€)": f"-{remb_16:,.0f} €".replace(",", " "), "% Produits": f"{remb_16/tp*100:.1f} %", "Moyenne / Norme": "4 - 8 %"},
             {"Solde Intermédiaire de Gestion": "= AUTOFINANCEMENT NET DISPONIBLE (CAF - Capital)", "Montant (€)": f"{autofin_net:+,.0f} €".replace(",", " "), "% Produits": f"{autofin_net/tp*100:+.1f} %", "Moyenne / Norme": "Norme >= 0 €"},
@@ -922,14 +963,16 @@ with onglets[1]:
     with c_sig2:
         st.markdown("**2. Diagnostic Patrimonial, Amortissements & Dette**")
         d_c1, d_c2 = st.columns(2)
-        d_c1.metric("Désendettement", f"{cap_desend:.1f} ans", f"Moy. {normes['desend_moy']} a. | Max {normes['desend_max']} a.", delta_color="normal" if cap_desend <= normes["desend_max"] else "inverse")
+        d_c1.metric("Désendettement OGEC", f"{cap_desend:.1f} ans", f"Moy. {normes['desend_moy']} a. | Max {normes['desend_max']} a.", delta_color="normal" if cap_desend <= normes["desend_max"] else "inverse")
         d_c2.metric("Absorption CAF / Dette", f"{taux_abs_caf:.0f} %", "Annuité / CAF (Max 75 %)", delta_color="normal" if taux_abs_caf <= 75 else "inverse")
         
         d_c3, d_c4 = st.columns(2)
-        d_c3.metric("Amortissements (681)", f"{amort_m2:.1f} €/m²", f"Moy. profil : {normes['amort_m2']} €/m²")
-        d_c4.metric("Trésorerie Sécurité", f"{j_treso} jours", f"Cible : {normes['jours_treso']} j", delta_color="normal" if j_treso >= 60 else "inverse")
+        d_c3.metric("Amortissements (681)", f"{amort_m2:.1f} €/m²", f"Repère {statut_immo.split()[0]} : {norme_amort_eff:.0f} €/m²")
+        d_c4.metric("Équivalent Loyer Global", f"{eq_loyer_m2:.1f} €/m²", f"Amort+Loyer+Int (Repère ~{norme_eq_loyer:.0f} €)")
 
-        st.metric("Règle d'Or Immobilière", f"{ro_solde:+,.0f} €".replace(",", " "), "Norme : >= 0 € (Contrib. 756 - [Amort+Int+Loyers])", delta_color="normal" if ro_ok else "inverse")
+        c_r1, c_r2 = st.columns(2)
+        c_r1.metric("Règle d'Or Immobilière", f"{ro_solde:+,.0f} €".replace(",", " "), "Norme : >= 0 €", delta_color="normal" if ro_ok else "inverse")
+        c_r2.metric("Trésorerie Sécurité", f"{j_treso} jours", f"Cible : {normes['jours_treso']} j", delta_color="normal" if j_treso >= 60 else "inverse")
 
         st.markdown("**3. Comparatif : Établissement vs Moyennes du Profil**")
         df_bench = pd.DataFrame([
@@ -947,23 +990,23 @@ with onglets[1]:
 
     synthese_tbi_lines = [
         f"• Cohérence EBE -> CAF : EBE de {tebe:.1f} % (moy. {normes['taux_ebe']} %) moins {poids_fin_tp:.1f} % d'intérêts = CAF de {tcaf:.1f} % (cible {normes['taux_caf']} %).",
-        f"• Endettement & Amortissements : Dette de {dette_16/1e6:.2f} M€ ({cap_desend:.1f} ans de CAF) ; l'annuité absorbe {taux_abs_caf:.0f} % de la CAF. Amortissements à {amort_m2:.1f} €/m².",
+        f"• Patrimoine ({statut_immo}) : Amortissements à {amort_m2:.1f} €/m² (repère {norme_amort_eff:.0f} €/m²) et équivalent loyer global à {eq_loyer_m2:.1f} €/m².",
         arb_txt
     ]
     pdf_tbi_bytes = build_pdf_tbi(
-        etab, normes, eleves_tot, surface_m2, health_score,
+        etab, normes, statut_immo, norme_amort_eff, eleves_tot, surface_m2, health_score,
         tp/1e6, ch_achats/1e6, ch_ext_hors_achats/1e6, valeur_ajoutee/1e6, ms_totale/1e6, ch_ufa_cfc_tot/1e6,
         ebe/1e6, fin_66/1e6, amort_68/1e6, rn/1e6, caf/1e6, remb_16/1e6, autofin_net/1e6,
         dette_16/1e6, cap_desend, treso_51/1e6, j_treso, ro_solde/1e6,
-        maint_m2, amort_m2, b_peda_eleve, marge_ufa/1e6, marge_cfc/1e6, synthese_tbi_lines
+        maint_m2, amort_m2, eq_loyer_m2, b_peda_eleve, ben_par_apprenti, ben_par_stagiaire, synthese_tbi_lines
     )
     st.download_button("📑 Télécharger le TBI Exécutif, SIG & Patrimoine (PDF 1 page)", data=pdf_tbi_bytes, file_name=f"TBI_Executif_{etab.replace(' ','_')}.pdf", mime="application/pdf", type="primary")
 
     afficher_synthese_unique(
-        "Situation à date : Rentabilité, Amortissements & Endettement",
-        f"L'établissement dégage un EBE de {ebe/1e6:.2f} M€ ({tebe:.1f} %) et, après {fin_66:,.0f} € de frais financiers ({poids_fin_tp:.1f} %), une CAF de {caf/1e6:.2f} M€ ({tcaf:.1f} % vs {normes['taux_caf']} % attendus). Les dotations aux amortissements s'élèvent à {amort_68:,.0f} € ({amort_m2:.1f} €/m² vs {normes['amort_m2']} €/m² en moyenne) et l'annuité de dette absorbe {taux_abs_caf:.0f} % de la CAF.".replace(",", " "),
+        "Situation à date : Rentabilité, Amortissements & Statut Immobilier",
+        f"L'établissement dégage un EBE de {ebe/1e6:.2f} M€ ({tebe:.1f} %) et, après {fin_66:,.0f} € de frais financiers ({poids_fin_tp:.1f} %), une CAF de {caf/1e6:.2f} M€ ({tcaf:.1f} % vs {normes['taux_caf']} % attendus). En statut **{statut_immo.lower()}**, les amortissements ressortent à {amort_m2:.1f} €/m² (repère ajusté : {norme_amort_eff:.0f} €/m²) et l'équivalent loyer global (amortissements + loyers AEP + intérêts) s'établit à {eq_loyer_m2:.1f} €/m².".replace(",", " "),
         f"L'autofinancement net disponible ressort à {autofin_net:+,.0f} €, la capacité de désendettement à {cap_desend:.1f} ans (moyenne : {normes['desend_moy']} ans) et la trésorerie à {j_treso} jours.".replace(",", " "),
-        "Inscrire au prochain Budget Prévisionnel une capacité d'autofinancement nette positive d'au moins 30 % des dotations aux amortissements pour financer le renouvellement courant sans alourdir la dette."
+        f"{'En tant que locataire AEP, vérifier que le loyer versé (613) permet à l AEP de couvrir ses emprunts de gros œuvre tout en laissant à l OGEC une capacité d autofinancement nette positive pour le mobilier et l informatique.' if 'Locataire' in statut_immo else 'Inscrire au prochain Budget Prévisionnel une capacité d autofinancement nette positive d au moins 30 % des dotations aux amortissements pour financer le renouvellement courant sans alourdir la dette.'}"
     )
 
 # ------------------------------------------
@@ -972,9 +1015,9 @@ with onglets[1]:
 with onglets[2]:
     st.subheader("Où faire ses choix ? Les indicateurs de pilotage pour le Budget Prévisionnel")
     afficher_aide_pedagogique_onglet("Arbitrer poste par poste dans le Budget Prévisionnel", [
-        ("Arbitrage Maintenance (615) vs Amortissements (681)", "Un bâtiment bien entretenu et rénové affiche des amortissements élevés (30-40 €/m²) et une maintenance contenue (< 20 €/m²). L'inverse signale un parc vieillissant qui coûte cher en réparations d'urgence."),
-        ("Équilibre Restauration & Internat", "Chaque euro de déficit sur la cantine ou l'internat ampute directement le budget pédagogique des élèves."),
-        ("Pôle Hors Contrat (UFA vs CFC)", "Permet de vérifier que la formation continue (CFC) ne détruit pas l'excédent dégagé par l'apprentissage (UFA).")
+        ("Relativisation Propriétaire vs Locataire sur l'immobilier", f"Votre statut est **{statut_immo}**. Pour un **propriétaire**, des amortissements faibles (ex. 18 €/m² en école ou < 25 €/m² en lycée) combinés à une maintenance élevée signale des locaux anciens déjà amortis nécessitant des travaux. Pour un **locataire**, un amortissement faible (~10 €/m²) est tout à fait normal puisque l'AEP porte les murs : il faut alors regarder le cumul `Amortissements 681 + Loyers 613`."),
+        ("Pôle Hors Contrat (UFA et Formation Continue)", "Permet de vérifier que chacune de ces deux activités dégage un bénéfice net positif afin d'améliorer la CAF globale de l'OGEC, sans jamais peser sur l'équilibre financier de l'activité scolaire sous contrat."),
+        ("Équilibre Restauration & Internat", "Chaque euro de déficit sur la cantine ou l'internat ampute directement le budget pédagogique des élèves.")
     ])
 
     st.markdown("#### 1. Structure RH Interne (Compte 64 vs Moyennes)")
@@ -995,15 +1038,17 @@ with onglets[2]:
 
     st.divider()
 
-    st.markdown("#### 2. Patrimoine : Maintenance (615), Amortissements (681) & Règle d'Or")
+    st.markdown(f"#### 2. Patrimoine : Maintenance (615), Amortissements (681) & Règle d'Or ({statut_immo})")
     cb1, cb2, cb3, cb4 = st.columns(4)
     cb1.metric("Maintenance (615)", f"{maint_m2:.1f} €/m²", f"Moy. : {normes['maint_m2']} €/m²", delta_color="inverse" if maint_m2 > normes["maint_m2"]*1.25 else "normal")
-    cb2.metric("Amortissements (681)", f"{amort_m2:.1f} €/m²", f"Moy. : {normes['amort_m2']} €/m²")
-    cb3.metric("Énergie & Fluides (606)", f"{fluides_eleve:,.0f} €/él.", f"Moy. : {normes['fluides_eleve']} €/él.", delta_color="inverse" if fluides_eleve > normes["fluides_eleve"]*1.2 else "normal")
+    cb2.metric("Amortissements (681)", f"{amort_m2:.1f} €/m²", f"Repère {statut_immo.split()[0]} : {norme_amort_eff:.0f} €/m²")
+    cb3.metric("Équivalent Loyer Global", f"{eq_loyer_m2:.1f} €/m²", f"Amort.+Loyers+Int. (Rep. ~{norme_eq_loyer:.0f} €)")
     cb4.metric("Solde Règle d'Or", f"{ro_solde:+,.0f} €".replace(",", " "), "Norme : >= 0 €", delta_color="normal" if ro_ok else "inverse")
 
-    if maint_m2 > normes["maint_m2"] * 1.2 and amort_m2 < normes["amort_m2"] * 0.85:
-        st.warning("**Signal de vétusté immobilière :** Votre maintenance au m² est élevée alors que vos dotations aux amortissements sont faibles. Vous réparez un bâti ancien au lieu d'investir dans sa rénovation.")
+    if "Locataire" in statut_immo:
+        st.info(f"**Lecture relativisée (OGEC Locataire) :** Les dotations aux amortissements ({amort_m2:.1f} €/m²) ne couvrent que les agencements et équipements mobiliers ; le loyer versé à l'AEP ({loyer_m2:.1f} €/m²) porte la charge des murs. L'équilibre s'apprécie sur l'équivalent loyer global ({eq_loyer_m2:.1f} €/m²).")
+    elif maint_m2 > normes["maint_m2"] * 1.15 and amort_m2 < norme_amort_eff * 0.85:
+        st.warning(f"**Signal de vieillissement immobilier (OGEC {statut_immo.split()[0]}) :** Votre maintenance au m² ({maint_m2:.1f} €/m²) est élevée alors que vos dotations aux amortissements ({amort_m2:.1f} €/m²) sont inférieures au repère ({norme_amort_eff:.0f} €/m²). Cela traduit un parc ancien déjà largement amorti qui génère des frais de réparation croissants.")
     if not ro_ok:
         st.error(f"**Rupture de la Règle d'Or ({ro_solde:+,.0f} €) :** Il manque **{int(round(abs(ro_solde)/eleves_tot))} € / élève / an** sur les contributions familles (756) pour couvrir les charges immobilières.".replace(",", " "))
 
@@ -1028,16 +1073,46 @@ with onglets[2]:
 
     if activer_ufa_cfc:
         st.divider()
-        st.markdown("#### 5. Pôle Hors Contrat : Apprentissage (UFA) vs Formation Continue (CFC)")
+        st.markdown("#### 5. Pôle Hors Contrat : Apprentissage (UFA) et Formation Continue (CFC)")
+        st.caption("Objectif : dégager un bénéfice net positif sur chacune des deux activités pour renforcer la CAF globale de l'établissement sans dégrader l'équilibre de l'activité scolaire sous contrat.")
         cu1, cu2 = st.columns(2)
-        cu1.metric("Marge Nette Apprentissage (UFA)", f"{marge_ufa:+,.0f} €".replace(",", " "), f"{marge_ufa/max(1,app_tot):+,.0f} €/apprenti")
-        cu2.metric("Marge Nette Formation Continue (CFC)", f"{marge_cfc:+,.0f} €".replace(",", " "), f"{stag_tot} stagiaires", delta_color="normal" if marge_cfc >= 0 else "inverse")
+        with cu1:
+            st.metric(
+                "Bénéfice Net Apprentissage (UFA)",
+                f"{marge_ufa:+,.0f} €".replace(",", " "),
+                f"{ben_par_apprenti:+,.0f} € / apprenti (Cible : +600 à +1 000 €/app.)",
+                delta_color="normal" if ben_par_apprenti >= 500 else ("off" if ben_par_apprenti >= 0 else "inverse")
+            )
+            if marge_ufa < 0:
+                st.error(f"**Déficit UFA ({marge_ufa:,.0f} €) :** L'apprentissage dégrade le résultat de l'OGEC et pèse sur l'activité scolaire.".replace(",", " "))
+            elif ben_par_apprenti < 600:
+                st.warning(f"**Rentabilité UFA limitée ({ben_par_apprenti:+,.0f} €/apprenti) :** Veiller à bien imputer les frais de structure (locaux, énergie, administration).")
+            else:
+                st.success(f"**Contribution positive :** L'UFA génère **{ben_par_apprenti:+,.0f} € / apprenti** et renforce la CAF globale.")
+        with cu2:
+            st.metric(
+                "Bénéfice Net Formation Continue (CFC)",
+                f"{marge_cfc:+,.0f} €".replace(",", " "),
+                f"{ben_par_stagiaire:+,.0f} € / stagiaire (Cible : +100 à +250 €/stag.)",
+                delta_color="normal" if ben_par_stagiaire >= 100 else ("off" if ben_par_stagiaire >= 0 else "inverse")
+            )
+            if marge_cfc < 0:
+                st.error(f"**Déficit Formation Continue ({marge_cfc:,.0f} €) :** L'activité dégrade la situation financière de l'établissement. Relever les seuils d'ouverture de stages.".replace(",", " "))
+            elif ben_par_stagiaire < 100:
+                st.warning(f"**Marge CFC faible ({ben_par_stagiaire:+,.0f} €/stagiaire) :** Optimiser le taux de remplissage des sessions.")
+            else:
+                st.success(f"**Contribution positive :** La CFC génère **{ben_par_stagiaire:+,.0f} € / stagiaire** et améliore la rentabilité globale.")
 
+    hc_synthese = (
+        f"Sur le pôle hors contrat, l'UFA dégage {marge_ufa:+,.0f} € ({ben_par_apprenti:+,.0f} €/apprenti vs cible +600 à +1 000 €) et la Formation Continue dégage {marge_cfc:+,.0f} € ({ben_par_stagiaire:+,.0f} €/stagiaire vs cible +100 à +250 €).".replace(",", " ")
+        if activer_ufa_cfc else
+        f"La restauration/internat couvre {tx_couv_resto:.1f} % de ses coûts directs ({marge_resto:+,.0f} €) et le budget pédagogique s'établit à {b_peda_eleve:,.0f} €/élève.".replace(",", " ")
+    )
     afficher_synthese_unique(
         "Indicateurs de pilotage annuel (Le Scalpel)",
-        f"L'effort immobilier global (Maintenance {maint_m2:.1f} €/m² + Amortissements {amort_m2:.1f} €/m² + Loyers) pèse {poids_immo_tp:.1f} % des produits scolaires (repère FNOGEC : 20-25 %). L'encadrement administratif représente {poids_admin_ms:.1f} % de la MS (moyenne : {normes['poids_admin']} %).",
-        f"La restauration/internat couvre {tx_couv_resto:.1f} % de ses coûts directs ({marge_resto:+,.0f} €) et le budget pédagogique s'établit à {b_peda_eleve:,.0f} €/élève.".replace(",", " "),
-        "Pour le prochain Budget Prévisionnel : ajuster les tarifs de pension pour éliminer tout déficit, conditionner les sessions CFC à une marge positive et arbitrer entre maintenance curative et travaux amortissables."
+        f"En statut **{statut_immo.lower()}**, l'effort immobilier global (Maintenance {maint_m2:.1f} €/m² + Amortissements {amort_m2:.1f} €/m² + Loyers {loyer_m2:.1f} €/m²) pèse {poids_immo_tp:.1f} % des produits scolaires (repère FNOGEC : 20-25 %). L'encadrement administratif représente {poids_admin_ms:.1f} % de la MS (moyenne : {normes['poids_admin']} %).",
+        hc_synthese,
+        "Pour le prochain Budget Prévisionnel : ajuster les tarifs de pension pour éliminer tout déficit, conditionner les sessions CFC et UFA à un bénéfice net unitaire positif et arbitrer entre maintenance curative et travaux amortissables."
     )
 
 # ------------------------------------------
@@ -1046,8 +1121,8 @@ with onglets[2]:
 with onglets[3]:
     st.subheader("Où allons-nous ? Poser financièrement le projet d'établissement à 5 ans (2026-2030)")
     afficher_aide_pedagogique_onglet("Tester la soutenabilité du PPI et de la dette à 5 ans", [
-        ("Taux de renouvellement futur (PPI / Amortissements)", "Permet de vérifier que votre Plan Pluriannuel d'Investissement (PPI) renouvelle bien le patrimoine (>= 100 % des amortissements)."),
-        ("Impact du PPI sur les amortissements et la Règle d'Or", "Tout nouvel investissement génère de nouvelles dotations aux amortissements (compte 681) dès sa mise en service. Il faut vérifier que les contributions des familles (756) suivront pour ne pas casser la Règle d'Or en 2030."),
+        ("Taux de renouvellement futur (PPI / Amortissements)", f"Statut : **{statut_immo}**. Permet de vérifier que votre Plan Pluriannuel d'Investissement (PPI) couvre au moins l'usure comptable annuelle (>= 100 % des amortissements)."),
+        ("Impact du PPI sur les amortissements et la Règle d'Or", "Tout nouvel investissement porté par l'OGEC génère de nouvelles dotations aux amortissements (compte 681) dès sa mise en service. Il faut vérifier que les contributions des familles (756) suivront pour ne pas casser la Règle d'Or en 2030."),
         ("OPEX induits", "Charges nouvelles (ménage, maintenance) ou économies d'énergie (-1 à -2 %) générées par les travaux.")
     ])
 
@@ -1062,7 +1137,7 @@ with onglets[3]:
         tx_forf_proj = st.slider("Indexation Forfaits & Tarifs (%/an)", 0.0, 5.0, 2.0, 0.1)
     with sp3:
         st.markdown("**3. Investissement (PPI)**")
-        ppi_annuel = st.slider("Enveloppe PPI cible (M€/an)", 0.0, 2.5, 0.30, 0.05)
+        ppi_annuel = st.slider("Enveloppe PPI cible (M€/an)", 0.0, 2.5, 0.30 if "Locataire" not in statut_immo else 0.10, 0.05)
         exec_pct = st.slider("Taux d'exécution PPI (%)", 50, 100, 85, 5)
         taux_subv_ppi = st.slider("Subventions Région/AEP/MASA (%)", 0, 70, 30, 5)
     with sp4:
@@ -1153,18 +1228,18 @@ with onglets[3]:
 
     feuille_route = [
         f"1. Solvabilité & Épargne : CAF cible de {caf_list[-1]:.2f} M€ en 2030 ({tcaf_2030:.1f} % vs {normes['taux_caf']} % attendus) et désendettement à {des_list[-1]:.1f} ans (dette : {det_list[-1]:.2f} M€).",
-        f"2. Renouvellement & Amortissements : PPI exécuté de {ppi_reel:.2f} M€/an couvrant {ren_list[-1]:.0f} % des dotations aux amortissements 2030 ({amo_list[-1]:.2f} M€).",
+        f"2. Renouvellement ({statut_immo}) : PPI exécuté de {ppi_reel:.2f} M€/an couvrant {ren_list[-1]:.0f} % des dotations aux amortissements 2030 ({amo_list[-1]:.2f} M€).",
         f"3. Étanchéité Règle d'Or 2030 : Solde prévisionnel de {ro_list[-1]:+.2f} M€ (indexation des contributions familles à +{tx_forf_proj:.1f} %/an pour absorber les nouveaux amortissements).",
         f"4. Maîtrise des charges & OPEX : Plafonner la MS interne à +{tx_ms_proj:.1f} %/an et intégrer {opex_ppi_pct:+.1f} %/an d'OPEX induits par les travaux.",
         f"5. Financement & Liquidité : Mobiliser {taux_subv_ppi} % de subventions, emprunter sur {duree_emprunt} ans et maintenir la trésorerie à {jtr_list[-1]:.0f} jours."
     ]
 
-    pdf_pro_bytes = build_pdf_prospective(etab, normes, ppi_annuel, exec_pct, df_proj, feuille_route)
+    pdf_pro_bytes = build_pdf_prospective(etab, normes, statut_immo, ppi_annuel, exec_pct, df_proj, feuille_route)
     st.download_button("📑 Télécharger la Synthèse Prospective 2026-2030 (PDF 1 page)", data=pdf_pro_bytes, file_name=f"Synthese_Prospective_2026_2030_{etab.replace(' ','_')}.pdf", mime="application/pdf", type="primary")
 
     afficher_synthese_unique(
         "Prospective : Soutenabilité du Projet d'Établissement à 5 ans",
-        f"Avec un PPI exécuté de {ppi_reel:.2f} M€/an (taux de renouvellement de {ren_list[-1]:.0f} % des amortissements en 2030), la dette atteint {det_list[-1]:.2f} M€ (désendettement : {des_list[-1]:.1f} ans) et la trésorerie s'établit à {jtr_list[-1]:.0f} jours.",
+        f"En statut **{statut_immo.lower()}**, avec un PPI exécuté de {ppi_reel:.2f} M€/an (taux de renouvellement de {ren_list[-1]:.0f} % des amortissements en 2030), la dette atteint {det_list[-1]:.2f} M€ (désendettement : {des_list[-1]:.1f} ans) et la trésorerie s'établit à {jtr_list[-1]:.0f} jours.",
         f"L'intégration des nouveaux amortissements ({amo_list[-1]:.2f} M€ en 2030) maintient un solde de Règle d'Or de {ro_list[-1]:+.2f} M€ sous réserve d'indexation des recettes à +{tx_forf_proj:.1f} %/an.",
         f"{'Le projet d investissement est soutenable en l état et peut être soumis au vote du Conseil d Administration.' if (jtr_list[-1] >= 60 and des_list[-1] <= normes['desend_max'] and ro_list[-1] >= 0) else 'Ajuster le calibrage du PPI, augmenter la part de subventions ou relever les contributions familles pour préserver la Règle d Or et la trésorerie à l horizon 2030.'}"
     )
