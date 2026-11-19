@@ -610,16 +610,49 @@ statut_immo = st.sidebar.selectbox(
     ]
 )
 is_agricole = ("Agricole" in type_etab) or ("MFR" in type_etab)
-normes = get_normes_etablissement(type_etab)
+normes_base = get_normes_etablissement(type_etab)
 etab = st.sidebar.text_input("Nom de l'établissement", "Lycée Polyvalent Saint-Éloi")
 
-# Ajustement de la norme d'amortissement au m² selon le statut immobilier
+# Barème personnalisable (Fiche Indices UDOGEC / Collectivité locale)
 if "Propriétaire" in statut_immo:
-    norme_amort_eff = normes["amort_m2"]
+    def_amort_m2 = normes_base["amort_m2"]
 elif "Locataire" in statut_immo:
-    norme_amort_eff = 10.0
+    def_amort_m2 = 10.0
 else:
-    norme_amort_eff = round(normes["amort_m2"] * 0.75, 1)
+    def_amort_m2 = round(normes_base["amort_m2"] * 0.75, 1)
+
+with st.sidebar.expander("🎯 Barème & Normes de référence (Personnalisable)", expanded=False):
+    st.caption("Saisissez ici les moyennes exactes de la fiche Indices UDOGEC ou du forfait voté par la collectivité.")
+    c_n1, c_n2 = st.columns(2)
+    n_forf = c_n1.number_input("Forfait public (€/él.)", value=int(normes_base["forfait_eleve"]), step=10)
+    n_cont = c_n2.number_input("Contrib. familles (€/él.)", value=int(normes_base["contrib_eleve"]), step=10)
+    c_n3, c_n4 = st.columns(2)
+    n_ebe = c_n3.number_input("Taux EBE moy. (%)", value=float(normes_base["taux_ebe"]), step=0.5)
+    n_caf = c_n4.number_input("Taux CAF cible (%)", value=float(normes_base["taux_caf"]), step=0.5)
+    c_n5, c_n6 = st.columns(2)
+    n_ms = c_n5.number_input("Poids MS moy. (%)", value=float(normes_base["poids_ms"]), step=1.0)
+    n_peda = c_n6.number_input("Budget pédago. (€/él.)", value=int(normes_base["b_peda"]), step=5)
+    c_n7, c_n8 = st.columns(2)
+    n_maint = c_n7.number_input("Maintenance (€/m²)", value=float(normes_base["maint_m2"]), step=1.0)
+    n_amort = c_n8.number_input("Amortissements (€/m²)", value=float(def_amort_m2), step=1.0)
+    c_n9, c_n10 = st.columns(2)
+    n_des_max = c_n9.number_input("Désendettement max (ans)", value=float(normes_base["desend_max"]), step=0.5)
+    n_j_tr = c_n10.number_input("Trésorerie cible (jours)", value=int(normes_base["jours_treso"]), step=5)
+
+normes = dict(normes_base)
+normes.update({
+    "forfait_eleve": n_forf,
+    "contrib_eleve": n_cont,
+    "taux_ebe": n_ebe,
+    "taux_caf": n_caf,
+    "poids_ms": n_ms,
+    "b_peda": n_peda,
+    "maint_m2": n_maint,
+    "amort_m2": n_amort,
+    "desend_max": n_des_max,
+    "jours_treso": n_j_tr,
+})
+norme_amort_eff = float(n_amort)
 
 c_sb1, c_sb2 = st.sidebar.columns(2)
 eleves_tot = c_sb1.number_input("Élèves (initial)", min_value=1, value=650, step=10)
@@ -655,13 +688,13 @@ else:
     d_ach = float(eleves_tot * normes["b_peda"] + internes_tot * 290)
     if "Propriétaire" in statut_immo:
         d_loy = 0.0
-        d_amo = float(round(surface_m2 * normes["amort_m2"]))
+        d_amo = float(round(surface_m2 * norme_amort_eff))
         d_det = 1150000.0
         d_remb = 110000.0
         d_fin = 42000.0
     elif "Locataire" in statut_immo:
-        d_loy = float(round(surface_m2 * max(8.0, normes["amort_m2"] - 8.0)))
-        d_amo = float(round(surface_m2 * 10.0))
+        d_loy = float(round(surface_m2 * max(8.0, normes_base["amort_m2"] - 8.0)))
+        d_amo = float(round(surface_m2 * norme_amort_eff))
         d_det = 180000.0
         d_remb = 25000.0
         d_fin = 8000.0
@@ -758,7 +791,7 @@ maint_m2 = maint_615 / max(1, surface_m2)
 amort_m2 = amort_68 / max(1, surface_m2)
 loyer_m2 = loyers_613 / max(1, surface_m2)
 eq_loyer_m2 = (amort_68 + loyers_613 + fin_66) / max(1, surface_m2)
-norme_eq_loyer = normes["amort_m2"] + 4.0
+norme_eq_loyer = normes_base["amort_m2"] + 4.0
 
 effort_immo_tot = maint_615 + amort_68 + loyers_613
 poids_immo_tp = (effort_immo_tot / tp_scol * 100) if tp_scol > 0 else 0.0
@@ -779,9 +812,9 @@ marge_cfc = prod_cfc - ch_cfc
 ben_par_apprenti = (marge_ufa / max(1, app_tot)) if activer_ufa_cfc else 0.0
 ben_par_stagiaire = (marge_cfc / max(1, stag_tot)) if activer_ufa_cfc else 0.0
 
-s_caf = min(30, max(0, int(round((tcaf / normes["taux_caf"]) * 25))))
+s_caf = min(30, max(0, int(round((tcaf / max(0.1, normes["taux_caf"])) * 25))))
 s_ro = 25 if ro_ok else max(0, int(round(25 + (ro_solde / max(1.0, c_756)) * 60)))
-s_treso = min(25, max(0, int(round((j_treso / normes["jours_treso"]) * 22))))
+s_treso = min(25, max(0, int(round((j_treso / max(1, normes["jours_treso"])) * 22))))
 s_det = 20 if cap_desend <= normes["desend_moy"] else (14 if cap_desend <= normes["desend_max"] else (6 if cap_desend <= 11 else 0))
 health_score = min(100, s_caf + s_ro + s_treso + s_det)
 
@@ -923,7 +956,7 @@ with onglets[1]:
     st.subheader("Où en est-on ? Situation à date, Cascade des SIG & Diagnostic Patrimonial")
     afficher_aide_pedagogique_onglet("Lecture de la cohérence EBE -> CAF & Relativisation Propriétaire / Locataire", [
         ("Passage EBE -> CAF", "La CAF est égale à l'EBE diminué des intérêts d'emprunts (compte 66). Si l'EBE est bon mais la CAF faible, c'est uniquement parce que les intérêts de la dette pèsent trop lourd."),
-        ("Relativisation Amortissements (681) vs Loyers (613)", f"Pour un profil **{normes['type_court']}** en statut **{statut_immo}**, le repère d'amortissement est ajusté à **~{norme_amort_eff:.0f} €/m²** (contre {normes['amort_m2']:.0f} €/m² en pleine propriété). Pour comparer objectivement propriétaires et locataires, on utilise l'**Équivalent Loyer global** `(Amort. 681 + Loyers 613 + Intérêts 66) / m²`."),
+        ("Relativisation Amortissements (681) vs Loyers (613)", f"Pour un profil **{normes['type_court']}** en statut **{statut_immo}**, le repère d'amortissement est ajusté à **~{norme_amort_eff:.0f} €/m²** (contre {normes_base['amort_m2']:.0f} €/m² en pleine propriété). Pour comparer objectivement propriétaires et locataires, on utilise l'**Équivalent Loyer global** `(Amort. 681 + Loyers 613 + Intérêts 66) / m²`."),
         ("Taux d'absorption de la CAF par la dette", "(Remboursement capital + Intérêts) / CAF. Si l'annuité totale de dette dépasse 75 % de la CAF, l'établissement n'a plus de marge pour autofinancer ses travaux courants.")
     ])
 
@@ -941,26 +974,37 @@ with onglets[1]:
     if poids_fin_tp > 2.5:
         st.warning(f"**Diagnostic EBE → CAF :** Les intérêts d'emprunts ({fin_66:,.0f} €, soit **{poids_fin_tp:.1f} %** des produits) amputent fortement l'EBE ({tebe:.1f} %) pour ramener la CAF à {tcaf:.1f} %. L'endettement pèse sur la rentabilité.".replace(",", " "))
 
-    c_sig1, c_sig2 = st.columns([1.45, 1])
-    with c_sig1:
-        st.markdown("**1. Cascade des Soldes Intermédiaires de Gestion (ANC 2018-06) vs Normes**")
-        df_sig = pd.DataFrame([
-            {"Solde Intermédiaire de Gestion": "Total Produits d'Exploitation (70/74/75 + UFA/CFC)", "Montant (€)": f"{tp:,.0f} €".replace(",", " "), "% Produits": "100,0 %", "Moyenne / Norme": "Base 100 %"},
-            {"Solde Intermédiaire de Gestion": "- Achats consommés (Pédagogie + Denrées 60)", "Montant (€)": f"-{ch_achats:,.0f} €".replace(",", " "), "% Produits": f"{ch_achats/tp*100:.1f} %", "Moyenne / Norme": "12 - 18 %"},
-            {"Solde Intermédiaire de Gestion": "- Services ext., Maintenance, Fluides & Loyers", "Montant (€)": f"-{ch_ext_hors_achats:,.0f} €".replace(",", " "), "% Produits": f"{ch_ext_hors_achats/tp*100:.1f} %", "Moyenne / Norme": "18 - 25 %"},
-            {"Solde Intermédiaire de Gestion": "= VALEUR AJOUTÉE (VA)", "Montant (€)": f"{valeur_ajoutee:,.0f} €".replace(",", " "), "% Produits": f"{valeur_ajoutee/tp*100:.1f} %", "Moyenne / Norme": "55 - 65 %"},
-            {"Solde Intermédiaire de Gestion": "- Masse Salariale interne (64) & Charges UFA/CFC", "Montant (€)": f"-{(ms_totale+ch_ufa_cfc_tot):,.0f} €".replace(",", " "), "% Produits": f"{(ms_totale+ch_ufa_cfc_tot)/tp*100:.1f} %", "Moyenne / Norme": f"MS scol. {normes['poids_ms']} %"},
-            {"Solde Intermédiaire de Gestion": "= EXCÉDENT BRUT D'EXPLOITATION (EBE)", "Montant (€)": f"{ebe:,.0f} €".replace(",", " "), "% Produits": f"{tebe:.1f} %", "Moyenne / Norme": f"Moy. {normes['taux_ebe']} %"},
-            {"Solde Intermédiaire de Gestion": "- Frais financiers / Intérêts emprunts (66)", "Montant (€)": f"-{fin_66:,.0f} €".replace(",", " "), "% Produits": f"{poids_fin_tp:.1f} %", "Moyenne / Norme": "Norme < 2,5 %"},
-            {"Solde Intermédiaire de Gestion": "= CAPACITÉ D'AUTOFINANCEMENT (CAF)", "Montant (€)": f"{caf:,.0f} €".replace(",", " "), "% Produits": f"{tcaf:.1f} %", "Moyenne / Norme": f"Cible >= {normes['taux_caf']} %"},
-            {"Solde Intermédiaire de Gestion": "- Dotations aux amortissements (681)", "Montant (€)": f"-{amort_68:,.0f} €".replace(",", " "), "% Produits": f"{amort_68/tp*100:.1f} %", "Moyenne / Norme": f"~{norme_amort_eff:.0f} €/m² ({statut_immo.split()[0]})"},
-            {"Solde Intermédiaire de Gestion": "= RÉSULTAT NET COMPTABLE (RCAI)", "Montant (€)": f"{rn:+,.0f} €".replace(",", " "), "% Produits": f"{rn/tp*100:+.1f} %", "Moyenne / Norme": "Norme >= 0 %"},
-            {"Solde Intermédiaire de Gestion": "- Remboursement annuel capital dette (164)", "Montant (€)": f"-{remb_16:,.0f} €".replace(",", " "), "% Produits": f"{remb_16/tp*100:.1f} %", "Moyenne / Norme": "4 - 8 %"},
-            {"Solde Intermédiaire de Gestion": "= AUTOFINANCEMENT NET DISPONIBLE (CAF - Capital)", "Montant (€)": f"{autofin_net:+,.0f} €".replace(",", " "), "% Produits": f"{autofin_net/tp*100:+.1f} %", "Moyenne / Norme": "Norme >= 0 €"},
-        ])
-        st.dataframe(df_sig, hide_index=True, use_container_width=True)
+    # Tableau SIG en pleine largeur pour une lisibilité parfaite de toutes les colonnes
+    st.markdown("**1. Cascade des Soldes Intermédiaires de Gestion (ANC 2018-06) vs Normes**")
+    df_sig = pd.DataFrame([
+        {"Solde Intermédiaire de Gestion": "Total Produits d'Exploitation (70/74/75 + UFA/CFC)", "Montant (€)": f"{tp:,.0f} €".replace(",", " "), "% Produits": "100,0 %", "Moyenne / Norme": "Base 100 %"},
+        {"Solde Intermédiaire de Gestion": "- Achats consommés (Pédagogie + Denrées Cpte 60)", "Montant (€)": f"-{ch_achats:,.0f} €".replace(",", " "), "% Produits": f"{ch_achats/tp*100:.1f} %", "Moyenne / Norme": "12,0 à 18,0 %"},
+        {"Solde Intermédiaire de Gestion": "- Services extérieurs, Maintenance, Fluides & Loyers (61-62)", "Montant (€)": f"-{ch_ext_hors_achats:,.0f} €".replace(",", " "), "% Produits": f"{ch_ext_hors_achats/tp*100:.1f} %", "Moyenne / Norme": "18,0 à 25,0 %"},
+        {"Solde Intermédiaire de Gestion": "= VALEUR AJOUTÉE (VA)", "Montant (€)": f"{valeur_ajoutee:,.0f} €".replace(",", " "), "% Produits": f"{valeur_ajoutee/tp*100:.1f} %", "Moyenne / Norme": "55,0 à 65,0 %"},
+        {"Solde Intermédiaire de Gestion": "- Masse Salariale interne (64) & Charges UFA/CFC", "Montant (€)": f"-{(ms_totale+ch_ufa_cfc_tot):,.0f} €".replace(",", " "), "% Produits": f"{(ms_totale+ch_ufa_cfc_tot)/tp*100:.1f} %", "Moyenne / Norme": f"MS scolaire moy. : {normes['poids_ms']} %"},
+        {"Solde Intermédiaire de Gestion": "= EXCÉDENT BRUT D'EXPLOITATION (EBE)", "Montant (€)": f"{ebe:,.0f} €".replace(",", " "), "% Produits": f"{tebe:.1f} %", "Moyenne / Norme": f"Moyenne profil : {normes['taux_ebe']} %"},
+        {"Solde Intermédiaire de Gestion": "- Frais financiers / Intérêts des emprunts (66)", "Montant (€)": f"-{fin_66:,.0f} €".replace(",", " "), "% Produits": f"{poids_fin_tp:.1f} %", "Moyenne / Norme": "Norme : < 2,5 %"},
+        {"Solde Intermédiaire de Gestion": "= CAPACITÉ D'AUTOFINANCEMENT (CAF)", "Montant (€)": f"{caf:,.0f} €".replace(",", " "), "% Produits": f"{tcaf:.1f} %", "Moyenne / Norme": f"Cible observatoire : >= {normes['taux_caf']} %"},
+        {"Solde Intermédiaire de Gestion": "- Dotations aux amortissements (681)", "Montant (€)": f"-{amort_68:,.0f} €".replace(",", " "), "% Produits": f"{amort_68/tp*100:.1f} %", "Moyenne / Norme": f"Repère {statut_immo.split()[0]} : ~{norme_amort_eff:.0f} €/m²"},
+        {"Solde Intermédiaire de Gestion": "= RÉSULTAT NET COMPTABLE (RCAI)", "Montant (€)": f"{rn:+,.0f} €".replace(",", " "), "% Produits": f"{rn/tp*100:+.1f} %", "Moyenne / Norme": "Norme : >= 0,0 %"},
+        {"Solde Intermédiaire de Gestion": "- Remboursement annuel capital dette (164)", "Montant (€)": f"-{remb_16:,.0f} €".replace(",", " "), "% Produits": f"{remb_16/tp*100:.1f} %", "Moyenne / Norme": "4,0 à 8,0 %"},
+        {"Solde Intermédiaire de Gestion": "= AUTOFINANCEMENT NET DISPONIBLE (CAF - Capital)", "Montant (€)": f"{autofin_net:+,.0f} €".replace(",", " "), "% Produits": f"{autofin_net/tp*100:+.1f} %", "Moyenne / Norme": "Norme : >= 0 €"},
+    ])
+    st.dataframe(
+        df_sig,
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            "Solde Intermédiaire de Gestion": st.column_config.TextColumn("Solde Intermédiaire de Gestion", width="large"),
+            "Montant (€)": st.column_config.TextColumn("Montant (€)", width="small"),
+            "% Produits": st.column_config.TextColumn("% Produits", width="small"),
+            "Moyenne / Norme": st.column_config.TextColumn("Moyenne / Norme", width="medium"),
+        }
+    )
 
-    with c_sig2:
+    st.markdown("---")
+    c_sig1, c_sig2 = st.columns(2)
+    with c_sig1:
         st.markdown("**2. Diagnostic Patrimonial, Amortissements & Dette**")
         d_c1, d_c2 = st.columns(2)
         d_c1.metric("Désendettement OGEC", f"{cap_desend:.1f} ans", f"Moy. {normes['desend_moy']} a. | Max {normes['desend_max']} a.", delta_color="normal" if cap_desend <= normes["desend_max"] else "inverse")
@@ -974,7 +1018,8 @@ with onglets[1]:
         c_r1.metric("Règle d'Or Immobilière", f"{ro_solde:+,.0f} €".replace(",", " "), "Norme : >= 0 €", delta_color="normal" if ro_ok else "inverse")
         c_r2.metric("Trésorerie Sécurité", f"{j_treso} jours", f"Cible : {normes['jours_treso']} j", delta_color="normal" if j_treso >= 60 else "inverse")
 
-        st.markdown("**3. Comparatif : Établissement vs Moyennes du Profil**")
+    with c_sig2:
+        st.markdown("**3. Comparatif : Établissement vs Barème de Référence**")
         df_bench = pd.DataFrame([
             {"Indicateur": "Forfait public / élève", "Établissement": f"{forfait_eleve_reel:,.0f} €", "Moyenne / Norme": f"{normes['forfait_eleve']:,.0f} €", "Statut": "OK" if forfait_eleve_reel >= normes['forfait_eleve']*0.95 else "Sous moy."},
             {"Indicateur": "Contribution familles / élève", "Établissement": f"{contrib_eleve_reel:,.0f} €", "Moyenne / Norme": f"{normes['contrib_eleve']:,.0f} €", "Statut": "OK" if contrib_eleve_reel >= normes['contrib_eleve']*0.9 else "Sous moy."},
